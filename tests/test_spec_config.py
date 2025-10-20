@@ -1,11 +1,4 @@
-"""Tests for spec_config.py.
-
-Tests the configuration system for building MuJoCo models, including:
-- Actuator creation and parameter validation (PD control, effort limits)
-- Collision geom property modification (friction, contact dimensions, regex matching)
-- Sensor addition (accelerometer, contact sensors, validation)
-- Visual elements (textures, materials, lights, cameras)
-"""
+"""Tests for spec_config.py."""
 
 import mujoco
 import pytest
@@ -15,10 +8,8 @@ from mjlab.utils.spec_config import (
   ActuatorCfg,
   CameraCfg,
   CollisionCfg,
-  ContactSensorCfg,
   LightCfg,
   MaterialCfg,
-  SensorCfg,
   TextureCfg,
 )
 
@@ -364,56 +355,6 @@ def test_collision_validation(param, value, expected_error):
       priority=params.get("priority", 0),
     )
     cfg.validate()
-
-
-# Sensor Tests
-
-
-def test_sensor_cfg_adds_sensor():
-  """SensorCfg should add sensors to spec."""
-  spec = mujoco.MjSpec()
-  body = spec.worldbody.add_body(name="test_body")
-  body.add_geom(name="test_geom", type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.1, 0.1, 0.1])
-
-  sensor_cfg = SensorCfg(
-    name="test_sensor",
-    sensor_type="accelerometer",
-    objtype="body",
-    objname="test_body",
-  )
-  sensor_cfg.edit_spec(spec)
-
-  sensor = spec.sensor("test_sensor")
-  assert sensor.name == "test_sensor"
-
-
-def test_contact_sensor_cfg():
-  """ContactSensorCfg should add contact sensors."""
-  spec = mujoco.MjSpec()
-  body = spec.worldbody.add_body(name="test_body")
-  body.add_geom(name="test_geom", type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.1, 0.1, 0.1])
-
-  sensor_cfg = ContactSensorCfg(
-    name="contact_sensor",
-    geom1="test_geom",
-    data=("found", "force"),
-  )
-  sensor_cfg.edit_spec(spec)
-
-  sensor = spec.sensor("contact_sensor")
-  assert sensor.name == "contact_sensor"
-
-
-def test_contact_sensor_validation():
-  """ContactSensorCfg should validate constraints."""
-  with pytest.raises(ValueError, match="Exactly one of"):
-    ContactSensorCfg(name="test", geom1="g1", body1="b1").validate()
-
-  with pytest.raises(ValueError, match="At most one of"):
-    ContactSensorCfg(name="test", geom1="g1", geom2="g2", body2="b2").validate()
-
-  with pytest.raises(ValueError, match="Site must be used with"):
-    ContactSensorCfg(name="test", site="s1").validate()
 
 
 # Visual Element Tests
