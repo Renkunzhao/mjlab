@@ -149,6 +149,7 @@ make format
 Compile documentation locally:
 
 ```bash
+uv pip install -r docs_web/requirements.txt
 make docs
 ```
 
