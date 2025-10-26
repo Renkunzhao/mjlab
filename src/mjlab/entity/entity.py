@@ -101,18 +101,18 @@ class Entity:
     - Fixed Base: Entity is welded to the world (no freejoint)
     - Floating Base: Entity has 6 DOF movement (has freejoint)
 
-    
+
   2. Articulation:
 
     - Non-articulated: No joints other than freejoint
     - Articulated: Has joints in kinematic tree (may or may not be actuated)
 
-    
+
   Fixed non-articulated entities can optionally be mocap bodies, whereby their
   position and orientation can be set directly each timestep rather than being
   determined by physics. This property can be useful for creating props with
   adjustable position and orientation.
-    
+
   Supported Combinations:
   -----------------------
 

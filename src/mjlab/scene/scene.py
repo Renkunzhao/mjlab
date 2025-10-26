@@ -17,6 +17,7 @@ _SCENE_XML = Path(__file__).parent / "scene.xml"
 @dataclass(kw_only=True)
 class SceneCfg:
   """Configuration for the scene."""
+
   num_envs: int = 1
   env_spacing: float = 2.0
   terrain: TerrainImporterCfg | None = None

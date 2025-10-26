@@ -52,6 +52,7 @@ def _get_platform_color(
 @dataclass(kw_only=True)
 class BoxFlatTerrainCfg(SubTerrainCfg):
   """Configuration for the box flat terrain."""
+
   def function(
     self, difficulty: float, spec: mujoco.MjSpec, rng: np.random.Generator
   ) -> TerrainOutput:
@@ -226,6 +227,7 @@ class BoxPyramidStairsTerrainCfg(SubTerrainCfg):
 @dataclass(kw_only=True)
 class BoxInvertedPyramidStairsTerrainCfg(BoxPyramidStairsTerrainCfg):
   """Configuration for the box inverted pyramid stairs terrain."""
+
   def function(
     self, difficulty: float, spec: mujoco.MjSpec, rng: np.random.Generator
   ) -> TerrainOutput:
@@ -381,6 +383,7 @@ class BoxInvertedPyramidStairsTerrainCfg(BoxPyramidStairsTerrainCfg):
 @dataclass(kw_only=True)
 class BoxRandomGridTerrainCfg(SubTerrainCfg):
   """Configuration for the box random grid terrain."""
+
   grid_width: float
   grid_height_range: tuple[float, float]
   platform_width: float = 1.0

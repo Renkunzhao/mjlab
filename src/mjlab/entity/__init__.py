@@ -1,6 +1,5 @@
 """Entity."""
 
-
 from mjlab.entity.data import EntityData
 from mjlab.entity.entity import (
   Entity,

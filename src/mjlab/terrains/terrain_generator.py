@@ -47,6 +47,7 @@ class SubTerrainCfg(abc.ABC):
 @dataclass(kw_only=True)
 class TerrainGeneratorCfg:
   """Configuration for the terrain generator."""
+
   seed: int | None = None
   curriculum: bool = False
   size: tuple[float, float]
