@@ -1,14 +1,14 @@
-Welcome to MjLab!
+Welcome to mjlab!
 =================
 
 .. figure:: source/_static/mjlab-banner.jpg
    :width: 100%            
-   :alt: MjLab   
+   :alt: mjlab   
 
-What is MjLab?
+What is mjlab?
 ==============
 
-**MjLab = Isaac Lab's API + MuJoCo's simplicity + GPU acceleration**
+**mjlab = Isaac Lab's API + MuJoCo's simplicity + GPU acceleration**
 
 We took Isaac Lab's proven manager-based architecture and RL abstractions, 
 then built them directly on MuJoCo Warp. No translation layers, no Omniverse 
@@ -17,21 +17,21 @@ overhead. Just fast, transparent physics.
 License
 =======
 
-MjLab is licensed under the Apache License, Version 2.0. Please refer 
+mjlab is licensed under the Apache License, Version 2.0. Please refer 
 to `License <https://github.com/mujocolab/mjlab/blob/main/LICENSE/>`_ for more details
 
 Acknowledgment
 ==============
 
-MjLab wouldn't exist without the excellent work of the Isaac 
-Lab team, whose API design and abstractions MjLab builds upon.
+mjlab wouldn't exist without the excellent work of the Isaac 
+Lab team, whose API design and abstractions mjlab builds upon.
 
 Thanks to the MuJoCo Warp team — especially Erik Frey and 
 Taylor Howell — for answering our questions, giving helpful 
 feedback, and implementing features based on our requests 
 countless times.
 
-If you used MjLab in your research, we would appreciate it if you could cite it:
+If you used mjlab in your research, we would appreciate it if you could cite it:
 
 .. code:: bibtex
 

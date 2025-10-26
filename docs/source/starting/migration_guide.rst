@@ -29,7 +29,7 @@ Import Paths
 |                                                              |                                                                   |
 |.. code-block:: python                                        |.. code-block:: python                                             |
 |                                                              |                                                                   |
-|  # Isaac Lab                                                 |  # MjLab                                                          |
+|  # Isaac Lab                                                 |  # mjlab                                                          |
 |  from isaaclab.envs import ManagerBasedRLEnv                 |  from mjlab.envs import ManagerBasedRlEnvCfg                      |
 |                                                              |                                                                   |
 +--------------------------------------------------------------+-------------------------------------------------------------------+
@@ -48,7 +48,7 @@ Isaac Lab uses ``@configclass``, mjlab uses Python's standard ``@dataclass`` wit
 |                                                               |                                                                   |
 |.. code-block:: python                                         |.. code-block:: python                                             |
 |                                                               |                                                                   |
-|  # Isaac Lab                                                  |  # MjLab                                                          |
+|  # Isaac Lab                                                  |  # mjlab                                                          |
 |  @configclass                                                 |  @dataclass                                                       |
 |  class RewardsCfg:                                            |  class RewardCfg:                                                 |
 |      """Reward terms for the MDP."""                          |      motion_global_root_pos: RewTerm = term(                      |
@@ -76,7 +76,7 @@ Scene setup is more streamlined in mjlab—no Omniverse/USD scene graphs. Instea
 |                                                                                            |                                                                           |
 |.. code-block:: python                                                                      |.. code-block:: python                                                     |
 |                                                                                            |                                                                           |
-|  # Isaac Lab                                                                               |  # MjLab                                                                  |
+|  # Isaac Lab                                                                               |  # mjlab                                                                  |
 |  from whole_body_tracking.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG                |  from mjlab.scene import SceneCfg                                         |
 |  from isaaclab.scene import InteractiveSceneCfg                                            |  from mjlab.asset_zoo.robots.unitree_g1.g1_constants import G1_ROBOT_CFG  |
 |  from isaaclab.sensors import ContactSensorCfg                                             |  from mjlab.utils.spec_config import ContactSensorCfg                     |

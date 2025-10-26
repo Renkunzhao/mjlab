@@ -21,7 +21,7 @@ The basic requirements are:
 
 .. attention::
     
-    MjLab is designed for large-scale training in GPU-accelerated simulations. 
+    mjlab is designed for large-scale training in GPU-accelerated simulations. 
     Since macOS does not support GPU acceleration, it is **not recommended** 
     for training. Even policy evaluation runs significantly slower on macOS. 
     We are working on improving this with a C-based MuJoCo backend for 
@@ -30,7 +30,7 @@ The basic requirements are:
 
 .. attention::
 
-    MjLab is currently in **beta**. Expect frequent breaking changes in the coming weeks.
+    mjlab is currently in **beta**. Expect frequent breaking changes in the coming weeks.
     There is **no stable release yet**.
 
     - The first beta snapshot is available on PyPI.

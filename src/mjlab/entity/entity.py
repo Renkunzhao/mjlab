@@ -96,13 +96,17 @@ class Entity:
   MuJoCo entities can be categorized along two dimensions:
 
   1. Base Type:
+
     - Fixed Base: Entity is welded to the world (no freejoint)
     - Floating Base: Entity has 6 DOF movement (has freejoint)
 
+    
   2. Articulation:
+
     - Non-articulated: No joints other than freejoint
     - Articulated: Has joints in kinematic tree (may or may not be actuated)
 
+    
   Supported Combinations:
   -----------------------
 
@@ -114,6 +118,7 @@ class Entity:
   | Floating Non-articulated  | Box, ball, mug             | False         | False          | False       |
   | Floating Articulated      | Humanoid, quadruped        | False         | True           | True/False  |
   +---------------------------+----------------------------+---------------+----------------+-------------+
+  
   """
 
   def __init__(self, cfg: EntityCfg) -> None:

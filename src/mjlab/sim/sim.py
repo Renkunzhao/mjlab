@@ -84,6 +84,7 @@ class MujocoCfg(SpecCfg):
 
 @dataclass(kw_only=True)
 class SimulationCfg:
+  """Configuration for the simulation."""
   nconmax: int | None = None
   njmax: int | None = None
   ls_parallel: bool = True  # Boosts perf quite noticeably.
