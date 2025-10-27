@@ -18,7 +18,20 @@ class G1FlatEnvCfg(TrackingEnvCfg):
       reduce="none",
       num_slots=1,
     )
-    self.scene.sensors = (self_collision_cfg,)
+    feet_ground_cfg = ContactSensorCfg(
+      name="feet_ground_contact",
+      primary=ContactMatch(
+        mode="subtree",
+        pattern=r"^(left_ankle_roll_link|right_ankle_roll_link)$",
+        entity="robot",
+      ),
+      secondary=ContactMatch(mode="body", pattern="terrain"),
+      fields=("found", "force", "pos"),
+      reduce="netforce",
+      num_slots=1,
+      track_air_time=True,
+    )
+    self.scene.sensors = (self_collision_cfg, feet_ground_cfg)
 
     self.actions.joint_pos.scale = G1_ACTION_SCALE
 

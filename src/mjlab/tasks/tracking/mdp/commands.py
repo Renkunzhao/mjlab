@@ -10,6 +10,7 @@ import numpy as np
 import torch
 
 from mjlab.managers import CommandTerm, CommandTermCfg
+from mjlab.sensor import ContactSensor
 from mjlab.third_party.isaaclab.isaaclab.utils.math import (
   quat_apply,
   quat_apply_inverse,
@@ -398,7 +399,7 @@ class MotionCommand(CommandTerm):
     self._current_bin_failed.zero_()
 
   def _debug_vis_impl(self, visualizer: DebugVisualizer) -> None:
-    """Draw ghost robot at target pose."""
+    """Draw ghost robot at target pose and contact forces."""
     if self._ghost_model is None:
       self._ghost_model = copy.deepcopy(self._env.sim.mj_model)
       self._ghost_model.geom_rgba[:] = self._ghost_color
@@ -414,6 +415,24 @@ class MotionCommand(CommandTerm):
     qpos[joint_q_adr] = self.joint_pos[visualizer.env_idx].cpu().numpy()
 
     visualizer.add_ghost_mesh(qpos, model=self._ghost_model)
+
+    # Draw foot contact wrenches.
+    if "feet_ground_contact" not in self._env.scene.sensors:
+      return
+    sensor: ContactSensor = self._env.scene["feet_ground_contact"]
+    assert sensor.data.force is not None and sensor.data.pos is not None
+    forces = sensor.data.force[visualizer.env_idx]  # (2, 3)
+    positions = sensor.data.pos[visualizer.env_idx]  # (2, 3)
+    for i in range(forces.shape[0]):
+      pos = positions[i]
+      force_end = pos - forces[i] * 0.003
+      visualizer.add_arrow(
+        start=pos,
+        end=force_end,
+        color=(0.2, 0.2, 0.6, 0.8),
+        width=0.02,
+        label=f"foot_{i}_force",
+      )
 
 
 @dataclass(kw_only=True)
