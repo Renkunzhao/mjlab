@@ -105,7 +105,6 @@ class UnitreeG1RoughEnvCfg(LocomotionVelocityEnvCfg):
     self.rewards.foot_slip.params["asset_cfg"].site_names = site_names
     self.rewards.foot_swing_height.params["target_height"] = target_foot_height
     self.rewards.foot_clearance.params["target_height"] = target_foot_height
-    self.rewards.body_ang_vel.params["asset_cfg"].body_names = ["torso_link"]
 
     # Observations.
     self.observations.critic.foot_height.params["asset_cfg"].site_names = site_names

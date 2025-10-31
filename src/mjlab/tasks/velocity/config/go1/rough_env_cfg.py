@@ -46,7 +46,15 @@ class UnitreeGo1RoughEnvCfg(LocomotionVelocityEnvCfg):
       reduce="none",
       num_slots=1,
     )
-    self.scene.sensors = (feet_ground_cfg, nonfoot_ground_cfg)
+    self_collision_cfg = ContactSensorCfg(
+      name="self_collision",
+      primary=ContactMatch(mode="subtree", pattern="trunk", entity="robot"),
+      secondary=ContactMatch(mode="subtree", pattern="trunk", entity="robot"),
+      fields=("found",),
+      reduce="none",
+      num_slots=1,
+    )
+    self.scene.sensors = (feet_ground_cfg, nonfoot_ground_cfg, self_collision_cfg)
 
     # Actions.
     self.actions.joint_pos.scale = GO1_ACTION_SCALE
@@ -70,10 +78,6 @@ class UnitreeGo1RoughEnvCfg(LocomotionVelocityEnvCfg):
     self.rewards.foot_clearance.params["asset_cfg"].site_names = site_names
     self.rewards.foot_swing_height.params["asset_cfg"].site_names = site_names
     self.rewards.foot_slip.params["asset_cfg"].site_names = site_names
-    # Disable G1-specific rewards.
-    self.rewards.self_collisions.weight = 0.0
-    self.rewards.body_ang_vel.weight = 0.0
-    self.rewards.angular_momentum.weight = 0.0
 
     # Observations.
     self.observations.critic.foot_height.params["asset_cfg"].site_names = site_names

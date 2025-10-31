@@ -188,7 +188,7 @@ class EventCfg:
   )
   foot_friction: EventTerm = term(
     EventTerm,
-    mode="startup",
+    mode="reset",
     func=mdp.randomize_field,
     params={
       "asset_cfg": SceneEntityCfg("robot", geom_names=[]),  # Override in robot cfg.
@@ -236,21 +236,11 @@ class RewardCfg:
       "running_threshold": 1.5,  # m/s
     },
   )
-  body_ang_vel: RewardTerm = term(
-    RewardTerm,
-    func=mdp.body_angular_velocity_penalty,
-    weight=-0.05,
-    params={
-      "asset_cfg": SceneEntityCfg("robot", body_names=[]),  # Override in robot cfg.
-    },
-  )
   angular_momentum: RewardTerm = term(
     RewardTerm,
     func=mdp.angular_momentum_penalty,
-    weight=-0.02,
-    params={
-      "sensor_name": "robot/root_angmom",
-    },
+    weight=-0.05,
+    params={"sensor_name": "robot/root_angmom"},
   )
   dof_pos_limits: RewardTerm = term(RewardTerm, func=mdp.joint_pos_limits, weight=-1.0)
   action_rate_l2: RewardTerm = term(RewardTerm, func=mdp.action_rate_l2, weight=-0.1)
