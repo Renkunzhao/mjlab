@@ -360,18 +360,6 @@ class CurriculumCfg:
     },
   )
 
-  soft_landing_weight: CurrTerm | None = term(
-    CurrTerm,
-    func=mdp.reward_weight,
-    params={
-      "reward_name": "soft_landing",
-      "weight_stages": [
-        {"step": 0, "weight": -1e-5},
-        {"step": 2000 * 24, "weight": -0.02},
-      ],
-    },
-  )
-
 
 ##
 # Environment.
