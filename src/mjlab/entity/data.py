@@ -43,8 +43,6 @@ class EntityData:
   default_root_state: torch.Tensor
   default_joint_pos: torch.Tensor
   default_joint_vel: torch.Tensor
-  default_joint_stiffness: torch.Tensor
-  default_joint_damping: torch.Tensor
 
   default_joint_pos_limits: torch.Tensor
   joint_pos_limits: torch.Tensor
@@ -56,6 +54,10 @@ class EntityData:
   is_fixed_base: bool
   is_articulated: bool
   is_actuated: bool
+
+  joint_pos_target: torch.Tensor
+  joint_vel_target: torch.Tensor
+  joint_effort_target: torch.Tensor
 
   # State dimensions.
   POS_DIM = 3
@@ -166,6 +168,19 @@ class EntityData:
     global_ctrl_ids = self.indexing.ctrl_ids[local_ctrl_ids]
     self.data.ctrl[env_ids, global_ctrl_ids] = ctrl
 
+  def write_qfrc_applied(
+    self,
+    effort: torch.Tensor,
+    target_indices: torch.Tensor,
+    env_ids: torch.Tensor | slice | None = None,
+  ) -> None:
+    if not self.is_actuated:
+      raise ValueError("Cannot write actuator effort for non-actuated entity.")
+
+    env_ids = self._resolve_env_ids(env_ids)
+    v_indices = self.indexing.joint_v_adr[target_indices]
+    self.data.qfrc_applied[env_ids, v_indices] = effort
+
   def write_mocap_pose(
     self, pose: torch.Tensor, env_ids: torch.Tensor | slice | None = None
   ) -> None:
@@ -178,15 +193,15 @@ class EntityData:
     self.data.mocap_quat[env_ids, self.indexing.mocap_id] = pose[:, 3:7].unsqueeze(1)
 
   def clear_state(self, env_ids: torch.Tensor | slice | None = None) -> None:
-    # Reset external wrenches on bodies and DoFs.
     env_ids = self._resolve_env_ids(env_ids)
     v_slice = self.indexing.free_joint_v_adr
     self.data.qfrc_applied[env_ids, v_slice] = 0.0
     self.data.xfrc_applied[env_ids, self.indexing.body_ids] = 0.0
 
-    # Reset control inputs.
     if self.is_actuated:
-      self.data.ctrl[env_ids, self.indexing.ctrl_ids] = 0.0
+      self.joint_pos_target[env_ids] = 0.0
+      self.joint_vel_target[env_ids] = 0.0
+      self.joint_effort_target[env_ids] = 0.0
 
   def _resolve_env_ids(
     self, env_ids: torch.Tensor | slice | None

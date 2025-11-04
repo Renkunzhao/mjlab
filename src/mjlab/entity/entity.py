@@ -9,6 +9,7 @@ import mujoco_warp as mjwarp
 import numpy as np
 import torch
 
+from mjlab import actuator
 from mjlab.entity.data import EntityData
 from mjlab.third_party.isaaclab.isaaclab.utils.string import resolve_matching_names
 from mjlab.utils import spec_config as spec_cfg
@@ -79,7 +80,7 @@ class EntityCfg:
 
 @dataclass
 class EntityArticulationInfoCfg:
-  actuators: tuple[spec_cfg.ActuatorCfg, ...] = field(default_factory=tuple)
+  actuators: tuple[actuator.ActuatorCfg, ...] = field(default_factory=tuple)
   soft_joint_pos_limit_factor: float = 1.0
 
 
@@ -126,6 +127,7 @@ class Entity:
       self._non_free_joints = tuple(all_joints[1:])
 
     self._apply_spec_editors()
+    self._add_actuators()
     self._add_initial_state_keyframe()
 
   def _apply_spec_editors(self) -> None:
@@ -139,8 +141,20 @@ class Entity:
       for cfg in cfg_list:
         cfg.edit_spec(self._spec)
 
-    if self.cfg.articulation:
-      spec_cfg.ActuatorSetCfg(self.cfg.articulation.actuators).edit_spec(self._spec)
+  def _add_actuators(self) -> None:
+    """Add actuators to the entity."""
+    self.actuators: list[actuator.Actuator] = []
+    if self.cfg.articulation is None:
+      return
+
+    for actuator_cfg in self.cfg.articulation.actuators:
+      actuator_instance = actuator_cfg.build(self)
+      actuator_instance.edit_spec(self._spec)
+      self.actuators.append(actuator_instance)
+
+    for joint in self._spec.joints:
+      for actuator_instance in self.actuators:
+        actuator_instance.create_actuator_for_target(self._spec, joint)
 
   def _add_initial_state_keyframe(self) -> None:
     qpos_components = []
@@ -158,8 +172,11 @@ class Entity:
 
     if self.is_actuated and joint_pos is not None:
       name_to_pos = {name: joint_pos[i] for i, name in enumerate(self.joint_names)}
-      ctrl = np.array([name_to_pos.get(act.name, 0.0) for act in self._spec.actuators])
-      key.ctrl = ctrl
+      ctrl = []
+      for act in self._spec.actuators:
+        joint_name = act.target
+        ctrl.append(name_to_pos.get(joint_name, 0.0))
+      key.ctrl = np.array(ctrl)
 
     if self.is_fixed_base:
       self.root_body.pos[:] = self.cfg.init_state.pos
@@ -180,7 +197,7 @@ class Entity:
   @property
   def is_actuated(self) -> bool:
     """Entity has actuated joints."""
-    return self.num_actuators > 0
+    return len(self.actuators) > 0
 
   @property
   def is_mocap(self) -> bool:
@@ -198,10 +215,6 @@ class Entity:
   @property
   def joint_names(self) -> list[str]:
     return [j.name.split("/")[-1] for j in self._non_free_joints]
-
-  @property
-  def tendon_names(self) -> list[str]:
-    return [t.name.split("/")[-1] for t in self._spec.tendons]
 
   @property
   def body_names(self) -> list[str]:
@@ -222,10 +235,6 @@ class Entity:
   @property
   def num_joints(self) -> int:
     return len(self.joint_names)
-
-  @property
-  def num_tendons(self) -> int:
-    return len(self.tendon_names)
 
   @property
   def num_bodies(self) -> int:
@@ -263,16 +272,6 @@ class Entity:
     if joint_subset is None:
       joint_subset = self.joint_names
     return resolve_matching_names(name_keys, joint_subset, preserve_order)
-
-  def find_tendons(
-    self,
-    name_keys: str | Sequence[str],
-    tendon_subset: list[str] | None = None,
-    preserve_order: bool = False,
-  ) -> tuple[list[int], list[str]]:
-    if tendon_subset is None:
-      tendon_subset = self.tendon_names
-    return resolve_matching_names(name_keys, tendon_subset, preserve_order)
 
   def find_actuators(
     self,
@@ -329,6 +328,9 @@ class Entity:
     self.indexing = indexing
     nworld = data.nworld
 
+    for act in self.actuators:
+      act.initialize(mj_model, model, data, device)
+
     # Root state.
     root_state_components = [self.cfg.init_state.pos, self.cfg.init_state.rot]
     if not self.is_fixed_base:
@@ -350,18 +352,10 @@ class Entity:
         resolve_expr(self.cfg.init_state.joint_vel, self.joint_names), device=device
       )[None].repeat(nworld, 1)
 
-      # Joint stiffness and damping.
-      if self.is_actuated:
-        default_joint_stiffness = model.actuator_gainprm[:, self.indexing.ctrl_ids, 0]
-        default_joint_damping = -model.actuator_biasprm[:, self.indexing.ctrl_ids, 2]
-      else:
-        default_joint_stiffness = torch.empty(
-          nworld, 0, dtype=torch.float, device=device
-        )
-        default_joint_damping = torch.empty(nworld, 0, dtype=torch.float, device=device)
-
       # Joint limits.
-      joint_ids_global = [j.id for j in self._non_free_joints]
+      joint_ids_global = torch.tensor(
+        [j.id for j in self._non_free_joints], device=device
+      )
       dof_limits = model.jnt_range[:, joint_ids_global]
       default_joint_pos_limits = dof_limits.clone()
       joint_pos_limits = default_joint_pos_limits.clone()
@@ -385,12 +379,6 @@ class Entity:
       empty_shape = (nworld, 0)
       default_joint_pos = torch.empty(*empty_shape, dtype=torch.float, device=device)
       default_joint_vel = torch.empty(*empty_shape, dtype=torch.float, device=device)
-      default_joint_stiffness = torch.empty(
-        *empty_shape, dtype=torch.float, device=device
-      )
-      default_joint_damping = torch.empty(
-        *empty_shape, dtype=torch.float, device=device
-      )
       default_joint_pos_limits = torch.empty(
         *empty_shape, 2, dtype=torch.float, device=device
       )
@@ -398,6 +386,21 @@ class Entity:
       soft_joint_pos_limits = torch.empty(
         *empty_shape, 2, dtype=torch.float, device=device
       )
+
+    if self.is_actuated:
+      joint_pos_target = torch.zeros(
+        (nworld, self.num_joints), dtype=torch.float, device=device
+      )
+      joint_vel_target = torch.zeros(
+        (nworld, self.num_joints), dtype=torch.float, device=device
+      )
+      joint_effort_target = torch.zeros(
+        (nworld, self.num_joints), dtype=torch.float, device=device
+      )
+    else:
+      joint_pos_target = torch.empty(nworld, 0, dtype=torch.float, device=device)
+      joint_vel_target = torch.empty(nworld, 0, dtype=torch.float, device=device)
+      joint_effort_target = torch.empty(nworld, 0, dtype=torch.float, device=device)
 
     self._data = EntityData(
       indexing=indexing,
@@ -407,8 +410,6 @@ class Entity:
       default_root_state=default_root_state,
       default_joint_pos=default_joint_pos,
       default_joint_vel=default_joint_vel,
-      default_joint_stiffness=default_joint_stiffness,
-      default_joint_damping=default_joint_damping,
       default_joint_pos_limits=default_joint_pos_limits,
       joint_pos_limits=joint_pos_limits,
       soft_joint_pos_limits=soft_joint_pos_limits,
@@ -417,16 +418,23 @@ class Entity:
       is_fixed_base=self.is_fixed_base,
       is_articulated=self.is_articulated,
       is_actuated=self.is_actuated,
+      joint_pos_target=joint_pos_target,
+      joint_vel_target=joint_vel_target,
+      joint_effort_target=joint_effort_target,
     )
 
   def update(self, dt: float) -> None:
-    del dt  # Unused.
+    for act in self.actuators:
+      act.update(dt)
 
   def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
     self.clear_state(env_ids)
 
+    for act in self.actuators:
+      act.reset(env_ids)
+
   def write_data_to_sim(self) -> None:
-    pass
+    self._apply_actuator_controls()
 
   def clear_state(self, env_ids: torch.Tensor | slice | None = None) -> None:
     self._data.clear_state(env_ids)
@@ -535,23 +543,62 @@ class Entity:
     """
     self._data.write_joint_velocity(velocity, joint_ids, env_ids)
 
-  def write_joint_position_target_to_sim(
+  def set_joint_position_target(
     self,
-    position_target: torch.Tensor,
+    position: torch.Tensor,
     joint_ids: torch.Tensor | slice | None = None,
     env_ids: torch.Tensor | slice | None = None,
   ) -> None:
-    """Set the joint position targets for PD control.
+    """Set joint position targets.
 
     Args:
-      position_target: Tensor of shape (N, num_joints) where N is the number of
-        environments.
-      joint_ids: Optional tensor or slice specifying which joints to set. If None,
-        all joints are set.
-      env_ids: Optional tensor or slice specifying which environments to set. If
-        None, all environments are set.
+      position: Target joint poisitions with shape (N, num_joints).
+      joint_ids: Optional joint indices to set. If None, set all joints.
+      env_ids: Optional environment indices. If None, set all environments.
     """
-    self._data.write_ctrl(position_target, joint_ids, env_ids)
+    if env_ids is None:
+      env_ids = slice(None)
+    if joint_ids is None:
+      joint_ids = slice(None)
+    self._data.joint_pos_target[env_ids, joint_ids] = position
+
+  def set_joint_velocity_target(
+    self,
+    velocity: torch.Tensor,
+    joint_ids: torch.Tensor | slice | None = None,
+    env_ids: torch.Tensor | slice | None = None,
+  ) -> None:
+    """Set joint velocity targets.
+
+    Args:
+      velocity: Target joint velocities with shape (N, num_joints).
+      joint_ids: Optional joint indices to set. If None, set all joints.
+      env_ids: Optional environment indices. If None, set all environments.
+    """
+    if env_ids is None:
+      env_ids = slice(None)
+    if joint_ids is None:
+      joint_ids = slice(None)
+    self._data.joint_vel_target[env_ids, joint_ids] = velocity
+
+  def set_joint_effort_target(
+    self,
+    effort: torch.Tensor,
+    joint_ids: torch.Tensor | slice | None = None,
+    env_ids: torch.Tensor | slice | None = None,
+  ) -> None:
+    """Set joint effort targets.
+
+    Args:
+      effort: Target joint efforts with shape (N, num_joints).
+      joint_ids: Optional joint indices to set. If None, set all joints.
+      env_ids: Optional environment indices. If None, set all environments.
+    """
+    if env_ids is None:
+      env_ids = slice(None)
+    if joint_ids is None:
+      joint_ids = slice(None)
+    self._data.joint_effort_target[env_ids, joint_ids] = effort
 
   def write_external_wrench_to_sim(
     self,
@@ -657,3 +704,17 @@ class Entity:
       free_joint_q_adr=free_joint_q_adr,
       free_joint_v_adr=free_joint_v_adr,
     )
+
+  def _apply_actuator_controls(self) -> None:
+    from mjlab.actuator.actuator import ActuatorCommand
+
+    for act in self.actuators:
+      command = ActuatorCommand(
+        position_target=self._data.joint_pos_target[:, act.target_indices],
+        velocity_target=self._data.joint_vel_target[:, act.target_indices],
+        effort_target=self._data.joint_effort_target[:, act.target_indices],
+        joint_pos=self._data.joint_pos[:, act.target_indices],
+        joint_vel=self._data.joint_vel[:, act.target_indices],
+      )
+      output = act.compute(command)
+      self._data.write_ctrl(output, act.ctrl_ids)

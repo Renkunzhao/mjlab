@@ -5,13 +5,14 @@ from pathlib import Path
 import mujoco
 
 from mjlab import MJLAB_SRC_PATH
+from mjlab.actuator import BuiltinPositionActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.actuator import (
   ElectricActuator,
   reflected_inertia_from_two_stage_planetary,
 )
 from mjlab.utils.os import update_assets
-from mjlab.utils.spec_config import ActuatorCfg, CollisionCfg
+from mjlab.utils.spec_config import CollisionCfg
 
 ##
 # MJCF and assets.
@@ -130,39 +131,39 @@ DAMPING_7520_14 = 2.0 * DAMPING_RATIO * ARMATURE_7520_14 * NATURAL_FREQ
 DAMPING_7520_22 = 2.0 * DAMPING_RATIO * ARMATURE_7520_22 * NATURAL_FREQ
 DAMPING_4010 = 2.0 * DAMPING_RATIO * ARMATURE_4010 * NATURAL_FREQ
 
-G1_ACTUATOR_5020 = ActuatorCfg(
-  joint_names_expr=[
+G1_ACTUATOR_5020 = BuiltinPositionActuatorCfg(
+  target_names_expr=[
     ".*_elbow_joint",
     ".*_shoulder_pitch_joint",
     ".*_shoulder_roll_joint",
     ".*_shoulder_yaw_joint",
     ".*_wrist_roll_joint",
   ],
+  kp=STIFFNESS_5020,
+  kv=DAMPING_5020,
   effort_limit=ACTUATOR_5020.effort_limit,
   armature=ACTUATOR_5020.reflected_inertia,
-  stiffness=STIFFNESS_5020,
-  damping=DAMPING_5020,
 )
-G1_ACTUATOR_7520_14 = ActuatorCfg(
-  joint_names_expr=[".*_hip_pitch_joint", ".*_hip_yaw_joint", "waist_yaw_joint"],
+G1_ACTUATOR_7520_14 = BuiltinPositionActuatorCfg(
+  target_names_expr=[".*_hip_pitch_joint", ".*_hip_yaw_joint", "waist_yaw_joint"],
+  kp=STIFFNESS_7520_14,
+  kv=DAMPING_7520_14,
   effort_limit=ACTUATOR_7520_14.effort_limit,
   armature=ACTUATOR_7520_14.reflected_inertia,
-  stiffness=STIFFNESS_7520_14,
-  damping=DAMPING_7520_14,
 )
-G1_ACTUATOR_7520_22 = ActuatorCfg(
-  joint_names_expr=[".*_hip_roll_joint", ".*_knee_joint"],
+G1_ACTUATOR_7520_22 = BuiltinPositionActuatorCfg(
+  target_names_expr=[".*_hip_roll_joint", ".*_knee_joint"],
+  kp=STIFFNESS_7520_22,
+  kv=DAMPING_7520_22,
   effort_limit=ACTUATOR_7520_22.effort_limit,
   armature=ACTUATOR_7520_22.reflected_inertia,
-  stiffness=STIFFNESS_7520_22,
-  damping=DAMPING_7520_22,
 )
-G1_ACTUATOR_4010 = ActuatorCfg(
-  joint_names_expr=[".*_wrist_pitch_joint", ".*_wrist_yaw_joint"],
+G1_ACTUATOR_4010 = BuiltinPositionActuatorCfg(
+  target_names_expr=[".*_wrist_pitch_joint", ".*_wrist_yaw_joint"],
+  kp=STIFFNESS_4010,
+  kv=DAMPING_4010,
   effort_limit=ACTUATOR_4010.effort_limit,
   armature=ACTUATOR_4010.reflected_inertia,
-  stiffness=STIFFNESS_4010,
-  damping=DAMPING_4010,
 )
 
 # Waist pitch/roll and ankles are 4-bar linkages with 2 5020 actuators.
@@ -170,19 +171,19 @@ G1_ACTUATOR_4010 = ActuatorCfg(
 # is configuration dependent. Since the exact geometry of the linkage is unknown, we
 # assume a nominal 1:1 gear ratio. Under this assumption, the joint armature in the
 # nominal configuration is approximated as the sum of the 2 actuators' armatures.
-G1_ACTUATOR_WAIST = ActuatorCfg(
-  joint_names_expr=["waist_pitch_joint", "waist_roll_joint"],
+G1_ACTUATOR_WAIST = BuiltinPositionActuatorCfg(
+  target_names_expr=["waist_pitch_joint", "waist_roll_joint"],
+  kp=STIFFNESS_5020 * 2,
+  kv=DAMPING_5020 * 2,
   effort_limit=ACTUATOR_5020.effort_limit * 2,
   armature=ACTUATOR_5020.reflected_inertia * 2,
-  stiffness=STIFFNESS_5020 * 2,
-  damping=DAMPING_5020 * 2,
 )
-G1_ACTUATOR_ANKLE = ActuatorCfg(
-  joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
+G1_ACTUATOR_ANKLE = BuiltinPositionActuatorCfg(
+  target_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
+  kp=STIFFNESS_5020 * 2,
+  kv=DAMPING_5020 * 2,
   effort_limit=ACTUATOR_5020.effort_limit * 2,
   armature=ACTUATOR_5020.reflected_inertia * 2,
-  stiffness=STIFFNESS_5020 * 2,
-  damping=DAMPING_5020 * 2,
 )
 
 ##
@@ -277,9 +278,10 @@ G1_ROBOT_CFG = EntityCfg(
 
 G1_ACTION_SCALE: dict[str, float] = {}
 for a in G1_ARTICULATION.actuators:
+  assert isinstance(a, BuiltinPositionActuatorCfg)
   e = a.effort_limit
-  s = a.stiffness
-  names = a.joint_names_expr
+  s = a.kp
+  names = a.target_names_expr
   if not isinstance(e, dict):
     e = {n: e for n in names}
   if not isinstance(s, dict):
@@ -287,6 +289,7 @@ for a in G1_ARTICULATION.actuators:
   for n in names:
     if n in e and n in s and s[n]:
       G1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
+
 
 if __name__ == "__main__":
   import mujoco.viewer as viewer
