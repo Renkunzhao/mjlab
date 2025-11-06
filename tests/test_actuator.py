@@ -6,10 +6,8 @@ import torch
 from conftest import get_test_device
 
 from mjlab.actuator import (
-  BuiltinMotorActuatorCfg,
-  BuiltinPositionActuatorCfg,
-  BuiltinVelocityActuatorCfg,
-  IdealPDActuatorCfg,
+  BuiltinPdActuatorCfg,
+  IdealPdActuatorCfg,
 )
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.sim.sim import Simulation, SimulationCfg
@@ -55,10 +53,10 @@ def initialize_entity(entity, device, num_envs=1):
   return entity, sim
 
 
-def test_builtin_position_actuator_compute(device):
-  """BuiltinPosition writes position targets to ctrl."""
-  actuator_cfg = BuiltinPositionActuatorCfg(
-    target_names_expr=["joint.*"], effort_limit=10.0, kp=50.0, kv=5.0
+def test_builtin_pd_actuator_compute(device):
+  """BuiltinPdActuator writes position targets to ctrl."""
+  actuator_cfg = BuiltinPdActuatorCfg(
+    joint_names_expr=["joint.*"], stiffness=50.0, damping=5.0
   )
   entity = create_entity_with_actuator(actuator_cfg)
   entity, sim = initialize_entity(entity, device)
@@ -70,40 +68,10 @@ def test_builtin_position_actuator_compute(device):
   assert torch.allclose(ctrl, torch.tensor([0.5, -0.3], device=device))
 
 
-def test_builtin_velocity_actuator_compute(device):
-  """BuiltinVelocity writes velocity targets to ctrl."""
-  actuator_cfg = BuiltinVelocityActuatorCfg(
-    target_names_expr=["joint.*"], effort_limit=10.0, kv=5.0
-  )
-  entity = create_entity_with_actuator(actuator_cfg)
-  entity, sim = initialize_entity(entity, device)
-
-  entity.set_joint_velocity_target(torch.tensor([[1.0, -2.0]], device=device))
-  entity.write_data_to_sim()
-
-  ctrl = sim.data.ctrl[0]
-  assert torch.allclose(ctrl, torch.tensor([1.0, -2.0], device=device))
-
-
-def test_builtin_motor_actuator_compute(device):
-  """BuiltinMotor writes effort targets directly to ctrl."""
-  actuator_cfg = BuiltinMotorActuatorCfg(
-    target_names_expr=["joint.*"], effort_limit=10.0
-  )
-  entity = create_entity_with_actuator(actuator_cfg)
-  entity, sim = initialize_entity(entity, device)
-
-  entity.set_joint_effort_target(torch.tensor([[3.0, -1.5]], device=device))
-  entity.write_data_to_sim()
-
-  ctrl = sim.data.ctrl[0]
-  assert torch.allclose(ctrl, torch.tensor([3.0, -1.5], device=device))
-
-
 def test_ideal_pd_actuator_compute(device):
-  """IdealPD computes torques via explicit PD control."""
-  actuator_cfg = IdealPDActuatorCfg(
-    target_names_expr=["joint.*"], effort_limit=100.0, kp=50.0, kd=5.0
+  """IdealPdActuator computes torques via explicit PD control."""
+  actuator_cfg = IdealPdActuatorCfg(
+    joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=50.0, damping=5.0
   )
   entity = create_entity_with_actuator(actuator_cfg)
   entity, sim = initialize_entity(entity, device)
@@ -124,8 +92,8 @@ def test_ideal_pd_actuator_compute(device):
 
 def test_targets_cleared_on_reset(device):
   """Entity.reset() zeros all targets."""
-  actuator_cfg = BuiltinPositionActuatorCfg(
-    target_names_expr=["joint.*"], effort_limit=10.0, kp=50.0, kv=5.0
+  actuator_cfg = BuiltinPdActuatorCfg(
+    joint_names_expr=["joint.*"], stiffness=50.0, damping=5.0
   )
   entity = create_entity_with_actuator(actuator_cfg)
   entity, sim = initialize_entity(entity, device)

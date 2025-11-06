@@ -143,18 +143,28 @@ class Entity:
 
   def _add_actuators(self) -> None:
     """Add actuators to the entity."""
+    # Should we parse existing XML-defined actuators here?
+
     self.actuators: list[actuator.Actuator] = []
     if self.cfg.articulation is None:
       return
 
     for actuator_cfg in self.cfg.articulation.actuators:
-      actuator_instance = actuator_cfg.build(self)
-      actuator_instance.edit_spec(self._spec)
-      self.actuators.append(actuator_instance)
+      # Find joints matching this actuator config.
+      joint_ids, joint_names = self.find_joints(actuator_cfg.joint_names_expr)
+      if len(joint_names) == 0:
+        raise ValueError(
+          "No joints found for actuator with expressions: "
+          f"{actuator_cfg.joint_names_expr}"
+        )
 
-    for joint in self._spec.joints:
-      for actuator_instance in self.actuators:
-        actuator_instance.create_actuator_for_target(self._spec, joint)
+      # Build actuator instance, passing resolved joint info.
+      actuator_instance = actuator_cfg.build(self, joint_ids, joint_names)
+
+      # Let actuator edit the spec.
+      actuator_instance.edit_spec(self._spec, joint_names)
+
+      self.actuators.append(actuator_instance)
 
   def _add_initial_state_keyframe(self) -> None:
     qpos_components = []
@@ -706,15 +716,12 @@ class Entity:
     )
 
   def _apply_actuator_controls(self) -> None:
-    from mjlab.actuator.actuator import ActuatorCommand
-
     for act in self.actuators:
-      command = ActuatorCommand(
-        position_target=self._data.joint_pos_target[:, act.target_indices],
-        velocity_target=self._data.joint_vel_target[:, act.target_indices],
-        effort_target=self._data.joint_effort_target[:, act.target_indices],
-        joint_pos=self._data.joint_pos[:, act.target_indices],
-        joint_vel=self._data.joint_vel[:, act.target_indices],
+      command = actuator.ActuatorCmd(
+        position_target=self._data.joint_pos_target[:, act.joint_ids],
+        velocity_target=self._data.joint_vel_target[:, act.joint_ids],
+        effort_target=self._data.joint_effort_target[:, act.joint_ids],
+        joint_pos=self._data.joint_pos[:, act.joint_ids],
+        joint_vel=self._data.joint_vel[:, act.joint_ids],
       )
-      output = act.compute(command)
-      self._data.write_ctrl(output, act.ctrl_ids)
+      self._data.write_ctrl(act.compute(command), act.ctrl_ids)

@@ -5,7 +5,7 @@ from pathlib import Path
 import mujoco
 
 from mjlab import MJLAB_SRC_PATH
-from mjlab.actuator import BuiltinPositionActuatorCfg
+from mjlab.actuator import BuiltinPdActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.actuator import ElectricActuator, reflected_inertia
 from mjlab.utils.os import update_assets
@@ -66,17 +66,17 @@ DAMPING_HIP = 2 * DAMPING_RATIO * HIP_ACTUATOR.reflected_inertia * NATURAL_FREQ
 STIFFNESS_KNEE = KNEE_ACTUATOR.reflected_inertia * NATURAL_FREQ**2
 DAMPING_KNEE = 2 * DAMPING_RATIO * KNEE_ACTUATOR.reflected_inertia * NATURAL_FREQ
 
-GO1_HIP_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
-  target_names_expr=[".*_hip_joint", ".*_thigh_joint"],
-  kp=STIFFNESS_HIP,
-  kv=DAMPING_HIP,
+GO1_HIP_ACTUATOR_CFG = BuiltinPdActuatorCfg(
+  joint_names_expr=[".*_hip_joint", ".*_thigh_joint"],
+  stiffness=STIFFNESS_HIP,
+  damping=DAMPING_HIP,
   effort_limit=HIP_ACTUATOR.effort_limit,
   armature=HIP_ACTUATOR.reflected_inertia,
 )
-GO1_KNEE_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
-  target_names_expr=[".*_calf_joint"],
-  kp=STIFFNESS_KNEE,
-  kv=DAMPING_KNEE,
+GO1_KNEE_ACTUATOR_CFG = BuiltinPdActuatorCfg(
+  joint_names_expr=[".*_calf_joint"],
+  stiffness=STIFFNESS_KNEE,
+  damping=DAMPING_KNEE,
   effort_limit=KNEE_ACTUATOR.effort_limit,
   armature=KNEE_ACTUATOR.reflected_inertia,
 )
@@ -148,10 +148,12 @@ GO1_ROBOT_CFG = EntityCfg(
 
 GO1_ACTION_SCALE: dict[str, float] = {}
 for a in GO1_ARTICULATION.actuators:
-  assert isinstance(a, BuiltinPositionActuatorCfg)
+  assert isinstance(a, BuiltinPdActuatorCfg)
   e = a.effort_limit
-  s = a.kp
-  names = a.target_names_expr
+  s = a.stiffness
+  names = a.joint_names_expr
+  if e is None:
+    continue  # Skip actuators without effort limits.
   if not isinstance(e, dict):
     e = {n: e for n in names}
   if not isinstance(s, dict):

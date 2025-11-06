@@ -5,7 +5,7 @@ import pytest
 import torch
 from conftest import get_test_device
 
-from mjlab.actuator import BuiltinPositionActuatorCfg, IdealPDActuatorCfg
+from mjlab.actuator import BuiltinPdActuatorCfg, IdealPdActuatorCfg
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.sim.sim import Simulation, SimulationCfg
 
@@ -55,11 +55,13 @@ def test_ideal_pd_matches_builtin_at_rest(device):
   kp, kv = 80.0, 10.0
 
   ideal_entity = create_entity_with_actuator(
-    IdealPDActuatorCfg(target_names_expr=["joint.*"], effort_limit=100.0, kp=kp, kd=kv)
+    IdealPdActuatorCfg(
+      joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
+    )
   )
   builtin_entity = create_entity_with_actuator(
-    BuiltinPositionActuatorCfg(
-      target_names_expr=["joint.*"], effort_limit=100.0, kp=kp, kv=kv
+    BuiltinPdActuatorCfg(
+      joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
     )
   )
 
@@ -93,11 +95,13 @@ def test_ideal_pd_matches_builtin_with_velocity(device):
   kp, kv = 80.0, 10.0
 
   ideal_entity = create_entity_with_actuator(
-    IdealPDActuatorCfg(target_names_expr=["joint.*"], effort_limit=100.0, kp=kp, kd=kv)
+    IdealPdActuatorCfg(
+      joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
+    )
   )
   builtin_entity = create_entity_with_actuator(
-    BuiltinPositionActuatorCfg(
-      target_names_expr=["joint.*"], effort_limit=100.0, kp=kp, kv=kv
+    BuiltinPdActuatorCfg(
+      joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
     )
   )
 
@@ -131,7 +135,9 @@ def test_ideal_pd_with_feedforward_effort(device):
   kp, kv = 50.0, 5.0
 
   ideal_entity = create_entity_with_actuator(
-    IdealPDActuatorCfg(target_names_expr=["joint.*"], effort_limit=100.0, kp=kp, kd=kv)
+    IdealPdActuatorCfg(
+      joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
+    )
   )
 
   ideal_entity, ideal_sim = initialize_entity(ideal_entity, device)
@@ -155,8 +161,8 @@ def test_ideal_pd_effort_clamping(device):
   effort_limit = 5.0
 
   ideal_entity = create_entity_with_actuator(
-    IdealPDActuatorCfg(
-      target_names_expr=["joint.*"], effort_limit=effort_limit, kp=kp, kd=kv
+    IdealPdActuatorCfg(
+      joint_names_expr=["joint.*"], effort_limit=effort_limit, stiffness=kp, damping=kv
     )
   )
 

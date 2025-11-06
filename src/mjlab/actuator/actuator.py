@@ -8,117 +8,92 @@ import mujoco
 import mujoco_warp as mjwarp
 import torch
 
-from mjlab.actuator.utils import resolve_param
-from mjlab.third_party.isaaclab.isaaclab.utils.string import resolve_matching_names
-from mjlab.utils.buffers import DelayBuffer
-
 if TYPE_CHECKING:
   from mjlab.entity import Entity
 
 
-@dataclass
-class ActuatorCommand:
-  """Input data for actuator computation."""
-
-  position_target: torch.Tensor
-  """Target positions for controlled joints (num_envs, num_targets)."""
-  velocity_target: torch.Tensor
-  """Target velocities for controlled joints (num_envs, num_targets)."""
-  effort_target: torch.Tensor
-  """Target efforts/torques for controlled joints (num_envs, num_targets)."""
-  joint_pos: torch.Tensor
-  """Current joint positions (num_envs, num_targets)."""
-  joint_vel: torch.Tensor
-  """Current joint velocities (num_envs, num_targets)."""
-
-
 @dataclass(kw_only=True)
 class ActuatorCfg(ABC):
-  """Base configuration for an actuator."""
+  joint_names_expr: list[str]
+  """Joints that are part of this actuator group.
 
-  target_names_expr: list[str]
-  """Regular expressions to match joint names."""
-  effort_limit: float | dict[str, float]
-  """Maximum force/torque limit."""
-  armature: float | dict[str, float] = 0.0
-  """Reflected rotor inertia. Defaults to 0."""
-  frictionloss: float | dict[str, float] = 0.0
-  """Static friction loss. Defaults to 0."""
-  min_delay: int = 0
-  """Minimum delay in timesteps (inclusive)."""
-  max_delay: int = 0
-  """Maximum delay in timesteps (inclusive)."""
+  Can be a list of joint names or list of regex expressions.
+  """
 
   @abstractmethod
-  def build(self, entity: Entity) -> Actuator:
-    """Build actuator instance from this config."""
+  def build(
+    self, entity: Entity, joint_ids: list[int], joint_names: list[str]
+  ) -> Actuator:
+    """Build actuator instance.
+
+    Args:
+      entity: Entity this actuator belongs to.
+      joint_ids: Local joint indices (for indexing entity joint arrays).
+      joint_names: Joint names corresponding to joint_ids.
+
+    Returns:
+      Actuator instance.
+    """
     raise NotImplementedError
+
+
+@dataclass
+class ActuatorCmd:
+  """High-level actuator command with targets and current state.
+
+  Passed to actuator's `compute()` method to generate low-level control signals.
+  All tensors have shape (num_envs, num_joints).
+  """
+
+  position_target: torch.Tensor
+  """Desired joint positions."""
+  velocity_target: torch.Tensor
+  """Desired joint velocities."""
+  effort_target: torch.Tensor
+  """Feedforward effort."""
+  joint_pos: torch.Tensor
+  """Current joint positions."""
+  joint_vel: torch.Tensor
+  """Current joint velocities."""
 
 
 class Actuator(ABC):
   """Base actuator interface."""
 
-  def __init__(self, cfg: ActuatorCfg, entity: Entity) -> None:
-    self.cfg = cfg
+  def __init__(
+    self,
+    entity: Entity,
+    joint_ids: list[int],
+    joint_names: list[str],
+  ) -> None:
     self.entity = entity
-    self._targets_to_actuate: list[mujoco.MjsJoint] = []
-    self._target_indices: torch.Tensor | None = None
+    self._joint_ids_list = joint_ids
+    self._joint_names = joint_names
+    self._joint_ids: torch.Tensor | None = None
     self._ctrl_ids: torch.Tensor | None = None
-    self._delay_buffer: DelayBuffer | None = None
+    self._actuator_specs: list[mujoco.MjsActuator] = []
 
   @property
-  def target_indices(self) -> torch.Tensor:
-    assert self._target_indices is not None
-    return self._target_indices
+  def joint_ids(self) -> torch.Tensor:
+    """Local indices of joints controlled by this actuator."""
+    assert self._joint_ids is not None
+    return self._joint_ids
 
   @property
   def ctrl_ids(self) -> torch.Tensor:
+    """Global indices of control inputs for this actuator."""
     assert self._ctrl_ids is not None
     return self._ctrl_ids
 
-  def edit_spec(self, spec: mujoco.MjSpec) -> None:
-    """Identify which joints this actuator controls.
+  @abstractmethod
+  def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
+    """Edit the MjSpec to add actuators and configure joints.
 
     This is called during entity construction, before the model is compiled.
 
     Args:
       spec: The entity's MjSpec to edit.
-    """
-    target_names = [j.name.split("/")[-1] for j in spec.joints]
-    target_indices, _ = resolve_matching_names(
-      self.cfg.target_names_expr, target_names, preserve_order=True
-    )
-    self._targets_to_actuate = [spec.joints[i] for i in target_indices]
-
-  def create_actuator_for_target(
-    self, spec: mujoco.MjSpec, target: mujoco.MjsJoint
-  ) -> None:
-    """Create MuJoCo actuator element for a target joint.
-
-    Called once per joint in the spec. Sets common joint parameters
-    (armature, frictionloss) and delegates actuator element creation to subclass.
-
-    Args:
-      spec: The entity's MjSpec.
-      target: A joint from spec.joints.
-    """
-    if target not in self._targets_to_actuate:
-      return
-
-    target.armature = resolve_param(self.cfg.armature, target.name)
-    target.frictionloss = resolve_param(self.cfg.frictionloss, target.name)
-
-    self._create_mj_actuator(spec, target)
-
-  @abstractmethod
-  def _create_mj_actuator(self, spec: mujoco.MjSpec, target: mujoco.MjsJoint) -> None:
-    """Create the MuJoCo actuator element for this target.
-
-    Subclasses implement this to configure actuator-specific parameters.
-
-    Args:
-      spec: The entity's MjSpec.
-      target: The target joint for this actuator.
+      joint_names: Names of joints controlled by this actuator.
     """
     raise NotImplementedError
 
@@ -131,8 +106,7 @@ class Actuator(ABC):
   ) -> None:
     """Initialize the actuator after model compilation.
 
-    This is called after the MjSpec is compiled into an MjModel and the simulation
-    is ready to run.
+    This is called after the MjSpec is compiled into an MjModel.
 
     Args:
       mj_model: The compiled MuJoCo model.
@@ -140,80 +114,63 @@ class Actuator(ABC):
       data: The mjwarp data arrays.
       device: Device for tensor operations (e.g., "cuda", "cpu").
     """
-    del mj_model, model  # Unused.
-
-    joint_indices, target_names = self.entity.find_joints(
-      self.cfg.target_names_expr, preserve_order=True
+    del mj_model, model, data  # Unused.
+    self._joint_ids = torch.tensor(
+      self._joint_ids_list, dtype=torch.long, device=device
     )
-    self._target_indices = torch.tensor(joint_indices, dtype=torch.long, device=device)
-    self._target_names = target_names
-
-    ctrl_ids_list = []
-    for target_name in target_names:
-      for local_idx, act in enumerate(self.entity.spec.actuators):
-        if act.name.split("/")[-1] == target_name:
-          ctrl_ids_list.append(local_idx)
-          break
-      else:
-        raise RuntimeError(
-          f"Actuator for joint '{target_name}' not found in spec. "
-          f"This should not happen - was create_actuator_for_target() called?"
-        )
+    ctrl_ids_list = [act.id for act in self._actuator_specs]
     self._ctrl_ids = torch.tensor(ctrl_ids_list, dtype=torch.long, device=device)
 
-    if self.cfg.max_delay > 0:
-      self._delay_buffer = DelayBuffer(
-        min_lag=self.cfg.min_delay,
-        max_lag=self.cfg.max_delay,
-        batch_size=data.nworld,
-        device=device,
-      )
-
   @abstractmethod
-  def compute(self, command: ActuatorCommand) -> torch.Tensor:
-    """Compute actuator outputs based on targets and current joint state.
+  def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
+    """Compute low-level actuator control signal from high-level commands.
 
     Args:
-      command: Actuator command data containing targets and current state.
+      cmd: High-level actuator command.
 
     Returns:
-      Actuator output values of shape (num_envs, num_targets).
+      Control signal tensor of shape (num_envs, num_actuators).
     """
     raise NotImplementedError
 
-  def _maybe_apply_delay(self, value: torch.Tensor) -> torch.Tensor:
-    """Apply delay to a value if delay buffer is configured.
-
-    Args:
-      value: Input tensor to delay (shape: [num_envs, num_targets]).
-
-    Returns:
-      Delayed value if delay is configured, otherwise the input value.
-    """
-    if self._delay_buffer is not None:
-      self._delay_buffer.append(value)
-      return self._delay_buffer.compute()
-    return value
+  # Optional methods.
 
   def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
     """Reset actuator state for specified environments.
 
-    Resets delay buffers. Override in actuators that maintain additional internal state.
+    Base implementation does nothing. Override in subclasses that maintain
+    internal state.
 
     Args:
       env_ids: Environment indices to reset. If None, reset all environments.
     """
-    if self._delay_buffer is not None:
-      buffer_env_ids = None if isinstance(env_ids, slice) else env_ids
-      self._delay_buffer.reset(buffer_env_ids)
+    del env_ids  # Unused.
 
   def update(self, dt: float) -> None:
     """Update actuator state after a simulation step.
 
-    Base implementation does nothing. Override in actuators that need
+    Base implementation does nothing. Override in subclasses that need
     per-step updates.
 
     Args:
       dt: Time step in seconds.
     """
     del dt  # Unused.
+
+
+def resolve_param_to_list(
+  param: float | dict[str, float], joint_names: list[str]
+) -> list[float]:
+  """Convert a parameter (float or dict) to a list matching joint order.
+
+  Args:
+    param: Either a single float value or a dict mapping joint names to values.
+    joint_names: Ordered list of joint names.
+
+  Returns:
+    List of parameter values in the same order as joint_names.
+  """
+  if isinstance(param, dict):
+    return [param.get(name, 0.0) for name in joint_names]
+  else:
+    return [param] * len(joint_names)
