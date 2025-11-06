@@ -1,6 +1,7 @@
 """MjSpec utils."""
 
 import mujoco
+import numpy as np
 
 
 def get_non_free_joints(spec: mujoco.MjSpec) -> tuple[mujoco.MjsJoint, ...]:
@@ -38,3 +39,57 @@ def is_joint_limited(jnt: mujoco.MjsJoint) -> bool:
       return jnt.range[0] < jnt.range[1]
     case _:
       return False
+
+
+def create_motor_actuator(
+  spec: mujoco.MjSpec,
+  joint_name: str,
+  *,
+  effort_limit: float,
+  gear: float = 1.0,
+  armature: float = 0.0,
+  stiction: float = 0.0,
+) -> mujoco.MjsActuator:
+  """Create a <motor> actuator."""
+  actuator = spec.add_actuator()
+  actuator.name = joint_name
+  actuator.target = joint_name
+  actuator.trntype = mujoco.mjtTrn.mjTRN_JOINT
+  actuator.dyntype = mujoco.mjtDyn.mjDYN_NONE
+  actuator.gaintype = mujoco.mjtGain.mjGAIN_FIXED
+  actuator.biastype = mujoco.mjtBias.mjBIAS_NONE
+  actuator.gainprm[0] = 1.0
+  actuator.gear[0] = gear
+  actuator.forcerange[:] = np.array([-effort_limit, effort_limit])
+  spec.joint(joint_name).armature = armature
+  spec.joint(joint_name).frictionloss = stiction
+  return actuator
+
+
+def create_position_actuator(
+  spec: mujoco.MjSpec,
+  joint_name: str,
+  *,
+  stiffness: float,
+  damping: float,
+  effort_limit: float | None = None,
+  armature: float = 0.0,
+  stiction: float = 0.0,
+) -> mujoco.MjsActuator:
+  """Creates a <position> actuator."""
+  actuator = spec.add_actuator()
+  actuator.name = joint_name
+  actuator.target = joint_name
+  actuator.trntype = mujoco.mjtTrn.mjTRN_JOINT
+  actuator.dyntype = mujoco.mjtDyn.mjDYN_NONE
+  actuator.gaintype = mujoco.mjtGain.mjGAIN_FIXED
+  actuator.biastype = mujoco.mjtBias.mjBIAS_AFFINE
+  actuator.inheritrange = 1.0
+  actuator.gainprm[0] = stiffness
+  actuator.biasprm[1] = -stiffness
+  actuator.biasprm[2] = -damping
+  if effort_limit is not None:
+    actuator.forcerange[:] = np.array([-effort_limit, effort_limit])
+  spec.joint(joint_name).armature = armature
+  spec.joint(joint_name).frictionloss = stiction
+  return actuator

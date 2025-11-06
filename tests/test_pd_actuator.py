@@ -51,7 +51,7 @@ def initialize_entity(entity, device, num_envs=1):
 
 
 def test_ideal_pd_matches_builtin_at_rest(device):
-  """IdealPD and BuiltinPosition produce equivalent actuator forces (qfrc_actuator)."""
+  """IdealPd and BuiltinPd produce equivalent actuator forces (qfrc_actuator)."""
   kp, kv = 80.0, 10.0
 
   ideal_entity = create_entity_with_actuator(
@@ -91,7 +91,7 @@ def test_ideal_pd_matches_builtin_at_rest(device):
 
 
 def test_ideal_pd_matches_builtin_with_velocity(device):
-  """IdealPD and BuiltinPosition produce equivalent damping forces with nonzero vel."""
+  """IdealPd and BuiltinPd produce equivalent damping forces with nonzero vel."""
   kp, kv = 80.0, 10.0
 
   ideal_entity = create_entity_with_actuator(
@@ -131,7 +131,7 @@ def test_ideal_pd_matches_builtin_with_velocity(device):
 
 
 def test_ideal_pd_with_feedforward_effort(device):
-  """IdealPD adds feedforward effort to PD output."""
+  """IdealPd adds feedforward effort to PD output."""
   kp, kv = 50.0, 5.0
 
   ideal_entity = create_entity_with_actuator(
@@ -156,7 +156,7 @@ def test_ideal_pd_with_feedforward_effort(device):
 
 
 def test_ideal_pd_effort_clamping(device):
-  """IdealPD clamps computed torques to [-effort_limit, effort_limit]."""
+  """IdealPd clamps computed torques to [-effort_limit, effort_limit]."""
   kp, kv = 100.0, 10.0
   effort_limit = 5.0
 

@@ -6,10 +6,10 @@ import torch
 from conftest import get_test_device
 
 from mjlab.actuator import (
-  DelayedBuiltinPdActuator,
-  DelayedBuiltinPdActuatorCfg,
-  DelayedIdealPdActuator,
-  DelayedIdealPdActuatorCfg,
+  BuiltinPdActuatorCfg,
+  DelayedActuator,
+  DelayedActuatorCfg,
+  IdealPdActuatorCfg,
 )
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.sim.sim import Simulation, SimulationCfg
@@ -44,11 +44,15 @@ def create_entity_with_delayed_builtin(delay_min_lag=0, delay_max_lag=3):
     spec_fn=lambda: mujoco.MjSpec.from_string(ROBOT_XML),
     articulation=EntityArticulationInfoCfg(
       actuators=(
-        DelayedBuiltinPdActuatorCfg(
+        DelayedActuatorCfg(
           joint_names_expr=["joint.*"],
-          effort_limit=100.0,
-          stiffness=80.0,
-          damping=10.0,
+          base_cfg=BuiltinPdActuatorCfg(
+            joint_names_expr=["joint.*"],
+            effort_limit=100.0,
+            stiffness=80.0,
+            damping=10.0,
+          ),
+          delay_target="position",
           delay_min_lag=delay_min_lag,
           delay_max_lag=delay_max_lag,
         ),
@@ -63,11 +67,15 @@ def create_entity_with_delayed_ideal(delay_min_lag=0, delay_max_lag=3):
     spec_fn=lambda: mujoco.MjSpec.from_string(ROBOT_XML),
     articulation=EntityArticulationInfoCfg(
       actuators=(
-        DelayedIdealPdActuatorCfg(
+        DelayedActuatorCfg(
           joint_names_expr=["joint.*"],
-          effort_limit=100.0,
-          stiffness=80.0,
-          damping=10.0,
+          base_cfg=IdealPdActuatorCfg(
+            joint_names_expr=["joint.*"],
+            effort_limit=100.0,
+            stiffness=80.0,
+            damping=10.0,
+          ),
+          delay_target="position",
           delay_min_lag=delay_min_lag,
           delay_max_lag=delay_max_lag,
         ),
@@ -85,36 +93,12 @@ def initialize_entity(entity, device, num_envs=1):
   return entity, sim
 
 
-def test_delayed_builtin_creates_delay_buffer(device):
-  """Test that delayed builtin actuator creates delay buffer."""
-  entity = create_entity_with_delayed_builtin(delay_min_lag=1, delay_max_lag=3)
-  entity, sim = initialize_entity(entity, device)
-
-  actuator = entity.actuators[0]
-  assert isinstance(actuator, DelayedBuiltinPdActuator)
-  assert actuator._delay_buffer is not None
-  assert actuator._delay_buffer.min_lag == 1
-  assert actuator._delay_buffer.max_lag == 3
-
-
-def test_delayed_ideal_creates_delay_buffer(device):
-  """Test that delayed ideal actuator creates delay buffer."""
-  entity = create_entity_with_delayed_ideal(delay_min_lag=1, delay_max_lag=3)
-  entity, sim = initialize_entity(entity, device)
-
-  actuator = entity.actuators[0]
-  assert isinstance(actuator, DelayedIdealPdActuator)
-  assert actuator._delay_buffer is not None
-  assert actuator._delay_buffer.min_lag == 1
-  assert actuator._delay_buffer.max_lag == 3
-
-
 def test_delayed_builtin_applies_constant_delay(device):
   """Test that delayed builtin actuator delays position targets."""
   entity = create_entity_with_delayed_builtin(delay_min_lag=2, delay_max_lag=2)
   entity, sim = initialize_entity(entity, device)
 
-  # Set position targets for 3 steps
+  # Set position targets for 3 steps.
   targets = [
     torch.tensor([[0.1, 0.2]], device=device),
     torch.tensor([[0.3, 0.4]], device=device),
@@ -129,10 +113,9 @@ def test_delayed_builtin_applies_constant_delay(device):
     entity.set_joint_effort_target(torch.zeros(1, 2, device=device))
     entity.write_data_to_sim()
 
-  # After 3 steps with lag=2, the output should be the target from step 0
-  # (clamped to available history)
+  # After 3 steps with lag=2, the output should be the target from step 0.
   ctrl = sim.data.ctrl[0]
-  # With constant lag=2, after 3 appends, we expect target from step 0
+  # With constant lag=2, after 3 appends, we expect target from step 0.
   assert torch.allclose(ctrl, targets[0][0], atol=1e-5)
 
 
@@ -145,7 +128,7 @@ def test_delayed_ideal_applies_delay(device):
   joint_vel = torch.zeros(1, 2, device=device)
   entity.write_joint_state_to_sim(joint_pos, joint_vel)
 
-  # Set position targets for 3 steps
+  # Set position targets for 3 steps.
   targets = [
     torch.tensor([[0.1, 0.2]], device=device),
     torch.tensor([[0.3, 0.4]], device=device),
@@ -159,7 +142,7 @@ def test_delayed_ideal_applies_delay(device):
     entity.write_data_to_sim()
     sim.forward()  # Compute actuator forces
 
-  # The computed torque should use the delayed target from step 0
+  # The computed torque should use the delayed target from step 0.
   joint_v_adr = entity.indexing.joint_v_adr
   qfrc = sim.data.qfrc_actuator[0, joint_v_adr]
 
@@ -172,19 +155,19 @@ def test_delayed_ideal_applies_delay(device):
 def test_delayed_actuator_reset(device):
   """Test that reset clears the delay buffer."""
   entity = create_entity_with_delayed_builtin(delay_min_lag=1, delay_max_lag=3)
-  entity, sim = initialize_entity(entity, device, num_envs=2)
+  entity, _ = initialize_entity(entity, device, num_envs=2)
 
-  # Set some targets to fill the buffer
+  # Set some targets to fill the buffer.
   entity.set_joint_position_target(torch.ones(2, 2, device=device) * 0.5)
   entity.set_joint_velocity_target(torch.zeros(2, 2, device=device))
   entity.set_joint_effort_target(torch.zeros(2, 2, device=device))
   entity.write_data_to_sim()
 
-  # Reset env 0
+  # Reset env 0.
   entity.reset(torch.tensor([0], device=device))
 
-  # Check that delay buffer was reset for env 0
+  # Check that delay buffer was reset for env 0.
   actuator = entity.actuators[0]
-  assert isinstance(actuator, DelayedBuiltinPdActuator)
+  assert isinstance(actuator, DelayedActuator)
   assert actuator._delay_buffer is not None
   assert actuator._delay_buffer.current_lags[0] == 0

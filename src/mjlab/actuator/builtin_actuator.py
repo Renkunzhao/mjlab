@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import mujoco
-import mujoco_warp as mjwarp
-import numpy as np
 import torch
 
 from mjlab.actuator.actuator import (
@@ -14,7 +12,7 @@ from mjlab.actuator.actuator import (
   ActuatorCmd,
   resolve_param_to_list,
 )
-from mjlab.utils.buffers import DelayBuffer
+from mjlab.utils.spec import create_motor_actuator, create_position_actuator
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -67,99 +65,23 @@ class BuiltinPdActuator(Actuator):
     if self.cfg.effort_limit is not None:
       effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
     else:
-      effort_limit = None
+      effort_limit = [None] * len(joint_names)
 
     # Add <position> actuator to spec, one per joint.
     for i, joint_name in enumerate(joint_names):
-      actuator = spec.add_actuator()
-      actuator.name = joint_name
-      actuator.target = joint_name
-      actuator.trntype = mujoco.mjtTrn.mjTRN_JOINT
-      actuator.dyntype = mujoco.mjtDyn.mjDYN_NONE
-      actuator.gaintype = mujoco.mjtGain.mjGAIN_FIXED
-      actuator.biastype = mujoco.mjtBias.mjBIAS_AFFINE
-      actuator.inheritrange = 1.0
-      actuator.gainprm[0] = stiffness[i]
-      actuator.biasprm[1] = -stiffness[i]
-      actuator.biasprm[2] = -damping[i]
-      if effort_limit is not None:
-        actuator.forcerange[:] = np.array([-effort_limit[i], effort_limit[i]])
-      spec.joint(joint_name).armature = armature[i]
-      spec.joint(joint_name).frictionloss = stiction[i]
+      actuator = create_position_actuator(
+        spec,
+        joint_name,
+        stiffness=stiffness[i],
+        damping=damping[i],
+        effort_limit=effort_limit[i],
+        armature=armature[i],
+        stiction=stiction[i],
+      )
       self._actuator_specs.append(actuator)
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     return cmd.position_target
-
-
-@dataclass(kw_only=True)
-class DelayedBuiltinPdActuatorCfg(BuiltinPdActuatorCfg):
-  """Built-in PD actuator config with action delays."""
-
-  delay_min_lag: int = 0
-  """Minimum delay lag in timesteps."""
-  delay_max_lag: int = 0
-  """Maximum delay lag in timesteps."""
-  delay_hold_prob: float = 0.0
-  """Probability of keeping previous lag when updating."""
-  delay_update_period: int = 0
-  """Period for updating delays (0 = every step)."""
-  delay_per_env_phase: bool = True
-  """Whether each environment has a different phase offset."""
-
-  def build(
-    self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> DelayedBuiltinPdActuator:
-    return DelayedBuiltinPdActuator(self, entity, joint_ids, joint_names)
-
-
-class DelayedBuiltinPdActuator(BuiltinPdActuator):
-  """Built-in PD actuator with action delays.
-
-  Delays position targets before passing them to the built-in PD controller.
-  """
-
-  def __init__(
-    self,
-    cfg: DelayedBuiltinPdActuatorCfg,
-    entity: Entity,
-    joint_ids: list[int],
-    joint_names: list[str],
-  ) -> None:
-    super().__init__(cfg, entity, joint_ids, joint_names)
-    self._delay_buffer: DelayBuffer | None = None
-
-  def initialize(
-    self,
-    mj_model: mujoco.MjModel,
-    model: mjwarp.Model,
-    data: mjwarp.Data,
-    device: str,
-  ) -> None:
-    super().initialize(mj_model, model, data, device)
-
-    cfg = self.cfg
-    assert isinstance(cfg, DelayedBuiltinPdActuatorCfg)
-
-    self._delay_buffer = DelayBuffer(
-      min_lag=cfg.delay_min_lag,
-      max_lag=cfg.delay_max_lag,
-      batch_size=data.nworld,
-      device=device,
-      hold_prob=cfg.delay_hold_prob,
-      update_period=cfg.delay_update_period,
-      per_env_phase=cfg.delay_per_env_phase,
-    )
-
-  def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
-    assert self._delay_buffer is not None
-    self._delay_buffer.append(cmd.position_target)
-    delayed_position_target = self._delay_buffer.compute()
-    return delayed_position_target
-
-  def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
-    if self._delay_buffer is not None:
-      self._delay_buffer.reset(env_ids)
 
 
 @dataclass(kw_only=True)
@@ -211,89 +133,15 @@ class BuiltinTorqueActuator(Actuator):
 
     # Add <motor> actuator to spec, one per joint.
     for i, joint_name in enumerate(joint_names):
-      actuator = spec.add_actuator()
-      actuator.name = joint_name
-      actuator.target = joint_name
-      actuator.trntype = mujoco.mjtTrn.mjTRN_JOINT
-      actuator.dyntype = mujoco.mjtDyn.mjDYN_NONE
-      actuator.gaintype = mujoco.mjtGain.mjGAIN_FIXED
-      actuator.biastype = mujoco.mjtBias.mjBIAS_NONE
-      actuator.gainprm[0] = 1.0
-      actuator.gear[0] = gear[i]
-      actuator.forcerange[:] = np.array([-effort_limit[i], effort_limit[i]])
-      spec.joint(joint_name).armature = armature[i]
-      spec.joint(joint_name).frictionloss = stiction[i]
+      actuator = create_motor_actuator(
+        spec,
+        joint_name,
+        effort_limit=effort_limit[i],
+        gear=gear[i],
+        armature=armature[i],
+        stiction=stiction[i],
+      )
       self._actuator_specs.append(actuator)
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     return cmd.effort_target
-
-
-@dataclass(kw_only=True)
-class DelayedBuiltinTorqueActuatorCfg(BuiltinTorqueActuatorCfg):
-  """Built-in torque actuator config with action delays."""
-
-  delay_min_lag: int = 0
-  """Minimum delay lag in timesteps."""
-  delay_max_lag: int = 0
-  """Maximum delay lag in timesteps."""
-  delay_hold_prob: float = 0.0
-  """Probability of keeping previous lag when updating."""
-  delay_update_period: int = 0
-  """Period for updating delays (0 = every step)."""
-  delay_per_env_phase: bool = True
-  """Whether each environment has a different phase offset."""
-
-  def build(
-    self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> DelayedBuiltinTorqueActuator:
-    return DelayedBuiltinTorqueActuator(self, entity, joint_ids, joint_names)
-
-
-class DelayedBuiltinTorqueActuator(BuiltinTorqueActuator):
-  """Built-in torque actuator with action delays.
-
-  Delays effort targets before passing them to the motor.
-  """
-
-  def __init__(
-    self,
-    cfg: DelayedBuiltinTorqueActuatorCfg,
-    entity: Entity,
-    joint_ids: list[int],
-    joint_names: list[str],
-  ) -> None:
-    super().__init__(cfg, entity, joint_ids, joint_names)
-    self._delay_buffer: DelayBuffer | None = None
-
-  def initialize(
-    self,
-    mj_model: mujoco.MjModel,
-    model: mjwarp.Model,
-    data: mjwarp.Data,
-    device: str,
-  ) -> None:
-    super().initialize(mj_model, model, data, device)
-
-    cfg = self.cfg
-    assert isinstance(cfg, DelayedBuiltinTorqueActuatorCfg)
-
-    self._delay_buffer = DelayBuffer(
-      min_lag=cfg.delay_min_lag,
-      max_lag=cfg.delay_max_lag,
-      batch_size=data.nworld,
-      device=device,
-      hold_prob=cfg.delay_hold_prob,
-      update_period=cfg.delay_update_period,
-      per_env_phase=cfg.delay_per_env_phase,
-    )
-
-  def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
-    assert self._delay_buffer is not None
-    self._delay_buffer.append(cmd.effort_target)
-    delayed_effort_target = self._delay_buffer.compute()
-    return delayed_effort_target
-
-  def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
-    if self._delay_buffer is not None:
-      self._delay_buffer.reset(env_ids)

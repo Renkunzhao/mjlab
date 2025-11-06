@@ -13,22 +13,8 @@ from mjlab.actuator.builtin_actuator import (
 from mjlab.actuator.builtin_actuator import (
   BuiltinTorqueActuatorCfg as BuiltinTorqueActuatorCfg,
 )
-from mjlab.actuator.builtin_actuator import (
-  DelayedBuiltinPdActuator as DelayedBuiltinPdActuator,
-)
-from mjlab.actuator.builtin_actuator import (
-  DelayedBuiltinPdActuatorCfg as DelayedBuiltinPdActuatorCfg,
-)
-from mjlab.actuator.builtin_actuator import (
-  DelayedBuiltinTorqueActuator as DelayedBuiltinTorqueActuator,
-)
-from mjlab.actuator.builtin_actuator import (
-  DelayedBuiltinTorqueActuatorCfg as DelayedBuiltinTorqueActuatorCfg,
-)
-from mjlab.actuator.pd_actuator import DelayedIdealPdActuator as DelayedIdealPdActuator
-from mjlab.actuator.pd_actuator import (
-  DelayedIdealPdActuatorCfg as DelayedIdealPdActuatorCfg,
-)
+from mjlab.actuator.delayed_actuator import DelayedActuator as DelayedActuator
+from mjlab.actuator.delayed_actuator import DelayedActuatorCfg as DelayedActuatorCfg
 from mjlab.actuator.pd_actuator import IdealPdActuator as IdealPdActuator
 from mjlab.actuator.pd_actuator import IdealPdActuatorCfg as IdealPdActuatorCfg
 from mjlab.actuator.xml_actuator import XmlPdActuator as XmlPdActuator

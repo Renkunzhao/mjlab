@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 import mujoco
 import mujoco_warp as mjwarp
-import numpy as np
 import torch
 
 from mjlab.actuator.actuator import (
@@ -16,7 +15,7 @@ from mjlab.actuator.actuator import (
   ActuatorCmd,
   resolve_param_to_list,
 )
-from mjlab.utils.buffers import DelayBuffer
+from mjlab.utils.spec import create_motor_actuator
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -73,17 +72,13 @@ class IdealPdActuator(Actuator):
 
     # Add <motor> actuator to spec, one per joint.
     for i, joint_name in enumerate(joint_names):
-      actuator = spec.add_actuator()
-      actuator.name = joint_name
-      actuator.target = joint_name
-      actuator.trntype = mujoco.mjtTrn.mjTRN_JOINT
-      actuator.dyntype = mujoco.mjtDyn.mjDYN_NONE
-      actuator.gaintype = mujoco.mjtGain.mjGAIN_FIXED
-      actuator.biastype = mujoco.mjtBias.mjBIAS_NONE
-      actuator.gainprm[0] = 1.0
-      actuator.forcerange[:] = np.array([-effort_limit[i], effort_limit[i]])
-      spec.joint(joint_name).armature = armature[i]
-      spec.joint(joint_name).frictionloss = stiction[i]
+      actuator = create_motor_actuator(
+        spec,
+        joint_name,
+        effort_limit=effort_limit[i],
+        armature=armature[i],
+        stiction=stiction[i],
+      )
       self._actuator_specs.append(actuator)
 
   def initialize(
@@ -113,89 +108,3 @@ class IdealPdActuator(Actuator):
     computed_torques += self.damping * vel_error
     computed_torques += cmd.effort_target
     return torch.clamp(computed_torques, -self.force_limit, self.force_limit)
-
-
-@dataclass(kw_only=True)
-class DelayedIdealPdActuatorCfg(IdealPdActuatorCfg):
-  """Ideal PD actuator config with action delays."""
-
-  delay_min_lag: int = 0
-  """Minimum delay lag in timesteps."""
-  delay_max_lag: int = 0
-  """Maximum delay lag in timesteps."""
-  delay_hold_prob: float = 0.0
-  """Probability of keeping previous lag when updating."""
-  delay_update_period: int = 0
-  """Period for updating delays (0 = every step)."""
-  delay_per_env_phase: bool = True
-  """Whether each environment has a different phase offset."""
-
-  def build(
-    self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> DelayedIdealPdActuator:
-    return DelayedIdealPdActuator(self, entity, joint_ids, joint_names)
-
-
-class DelayedIdealPdActuator(IdealPdActuator):
-  """Ideal PD actuator with action delays.
-
-  Delays position targets before computing PD torques.
-  """
-
-  def __init__(
-    self,
-    cfg: DelayedIdealPdActuatorCfg,
-    entity: Entity,
-    joint_ids: list[int],
-    joint_names: list[str],
-  ) -> None:
-    super().__init__(cfg, entity, joint_ids, joint_names)
-    self._delay_buffer: DelayBuffer | None = None
-
-  def initialize(
-    self,
-    mj_model: mujoco.MjModel,
-    model: mjwarp.Model,
-    data: mjwarp.Data,
-    device: str,
-  ) -> None:
-    super().initialize(mj_model, model, data, device)
-
-    cfg = self.cfg
-    assert isinstance(cfg, DelayedIdealPdActuatorCfg)
-
-    num_envs = data.qpos.shape[0]
-    self._delay_buffer = DelayBuffer(
-      min_lag=cfg.delay_min_lag,
-      max_lag=cfg.delay_max_lag,
-      batch_size=num_envs,
-      device=device,
-      hold_prob=cfg.delay_hold_prob,
-      update_period=cfg.delay_update_period,
-      per_env_phase=cfg.delay_per_env_phase,
-    )
-
-  def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
-    assert (
-      self.stiffness is not None
-      and self.damping is not None
-      and self.force_limit is not None
-    )
-    assert self._delay_buffer is not None
-
-    self._delay_buffer.append(cmd.position_target)
-    delayed_position_target = self._delay_buffer.compute()
-
-    pos_error = delayed_position_target - cmd.joint_pos
-    vel_error = cmd.velocity_target - cmd.joint_vel
-    computed_torques = (
-      self.stiffness * pos_error + self.damping * vel_error + cmd.effort_target
-    )
-    computed_torques = torch.clamp(
-      computed_torques, -self.force_limit, self.force_limit
-    )
-    return computed_torques
-
-  def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
-    if self._delay_buffer is not None:
-      self._delay_buffer.reset(env_ids)
