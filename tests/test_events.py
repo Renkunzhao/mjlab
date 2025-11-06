@@ -131,18 +131,14 @@ def test_randomize_pd_gains(device):
   env.num_envs = 2
   env.device = device
 
-  # Create mock entity with all three types of actuators.
   mock_entity = Mock()
 
-  # Mock BuiltinPdActuator.
   builtin_actuator = Mock(spec=actuator.BuiltinPdActuator)
   builtin_actuator.ctrl_ids = torch.tensor([0, 1], device=device)
 
-  # Mock XmlPdActuator.
   xml_actuator = Mock(spec=actuator.XmlPdActuator)
   xml_actuator.ctrl_ids = torch.tensor([2, 3], device=device)
 
-  # Mock IdealPdActuator with stiffness and damping tensors.
   ideal_actuator = Mock(spec=actuator.IdealPdActuator)
   ideal_actuator.ctrl_ids = torch.tensor([4, 5], device=device)
   ideal_actuator.stiffness = torch.tensor(
@@ -150,13 +146,11 @@ def test_randomize_pd_gains(device):
   )
   ideal_actuator.damping = torch.tensor([[10.0, 10.0], [10.0, 10.0]], device=device)
 
-  # Attach the real set_gains method to the mock.
   ideal_actuator.set_gains = actuator.IdealPdActuator.set_gains.__get__(ideal_actuator)
 
   mock_entity.actuators = [builtin_actuator, xml_actuator, ideal_actuator]
   env.scene = {"robot": mock_entity}
 
-  # Mock sim with model fields.
   env.sim = Mock()
   env.sim.model = Mock()
   env.sim.model.actuator_gainprm = torch.ones((2, 6, 10), device=device) * 50.0
@@ -175,7 +169,6 @@ def test_randomize_pd_gains(device):
     operation="scale",
   )
 
-  # Verify BuiltinPdActuator gains were scaled.
   assert torch.allclose(
     env.sim.model.actuator_gainprm[0, [0, 1], 0],
     torch.tensor([75.0, 75.0], device=device),
@@ -189,7 +182,6 @@ def test_randomize_pd_gains(device):
     torch.tensor([-10.0, -10.0], device=device),
   )
 
-  # Verify XmlPdActuator gains were scaled.
   assert torch.allclose(
     env.sim.model.actuator_gainprm[0, [2, 3], 0],
     torch.tensor([75.0, 75.0], device=device),
@@ -203,7 +195,6 @@ def test_randomize_pd_gains(device):
     torch.tensor([-10.0, -10.0], device=device),
   )
 
-  # Verify IdealPdActuator gains were scaled.
   assert torch.allclose(
     ideal_actuator.stiffness[0],
     torch.tensor([150.0, 150.0], device=device),
@@ -224,7 +215,6 @@ def test_randomize_pd_gains(device):
     operation="abs",
   )
 
-  # Verify BuiltinPdActuator gains were set to absolute values.
   assert torch.allclose(
     env.sim.model.actuator_gainprm[1, [0, 1], 0],
     torch.tensor([200.0, 200.0], device=device),
@@ -238,7 +228,6 @@ def test_randomize_pd_gains(device):
     torch.tensor([-25.0, -25.0], device=device),
   )
 
-  # Verify XmlPdActuator gains were set to absolute values.
   assert torch.allclose(
     env.sim.model.actuator_gainprm[1, [2, 3], 0],
     torch.tensor([200.0, 200.0], device=device),
@@ -252,7 +241,6 @@ def test_randomize_pd_gains(device):
     torch.tensor([-25.0, -25.0], device=device),
   )
 
-  # Verify IdealPdActuator gains were set to absolute values.
   assert torch.allclose(
     ideal_actuator.stiffness[1],
     torch.tensor([200.0, 200.0], device=device),
@@ -260,4 +248,102 @@ def test_randomize_pd_gains(device):
   assert torch.allclose(
     ideal_actuator.damping[1],
     torch.tensor([25.0, 25.0], device=device),
+  )
+
+
+def test_randomize_effort_limits(device):
+  """Test effort limit randomization."""
+  env = Mock()
+  env.num_envs = 2
+  env.device = device
+
+  mock_entity = Mock()
+
+  builtin_actuator = Mock(spec=actuator.BuiltinPdActuator)
+  builtin_actuator.ctrl_ids = torch.tensor([0, 1], device=device)
+
+  xml_actuator = Mock(spec=actuator.XmlPdActuator)
+  xml_actuator.ctrl_ids = torch.tensor([2, 3], device=device)
+
+  ideal_actuator = Mock(spec=actuator.IdealPdActuator)
+  ideal_actuator.ctrl_ids = torch.tensor([4, 5], device=device)
+  ideal_actuator.force_limit = torch.tensor([[50.0, 50.0], [50.0, 50.0]], device=device)
+
+  ideal_actuator.set_effort_limit = actuator.IdealPdActuator.set_effort_limit.__get__(
+    ideal_actuator
+  )
+
+  mock_entity.actuators = [builtin_actuator, xml_actuator, ideal_actuator]
+  env.scene = {"robot": mock_entity}
+
+  env.sim = Mock()
+  env.sim.model = Mock()
+  env.sim.model.actuator_forcerange = torch.zeros((2, 6, 2), device=device)
+  env.sim.model.actuator_forcerange[:, :, 0] = -100.0  # Lower limit
+  env.sim.model.actuator_forcerange[:, :, 1] = 100.0  # Upper limit
+
+  # Test scale operation.
+  events.randomize_effort_limits(
+    env,
+    torch.tensor([0], device=device),
+    effort_limit_range=(2.0, 2.0),  # 2x scale
+    asset_cfg=SceneEntityCfg("robot"),
+    distribution="uniform",
+    operation="scale",
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [0, 1], 0],
+    torch.tensor([-200.0, -200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [0, 1], 1],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [2, 3], 0],
+    torch.tensor([-200.0, -200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [2, 3], 1],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+
+  assert torch.allclose(
+    ideal_actuator.force_limit[0],
+    torch.tensor([100.0, 100.0], device=device),
+  )
+
+  # Test abs operation.
+  events.randomize_effort_limits(
+    env,
+    torch.tensor([1], device=device),
+    effort_limit_range=(150.0, 150.0),
+    asset_cfg=SceneEntityCfg("robot"),
+    distribution="uniform",
+    operation="abs",
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [0, 1], 0],
+    torch.tensor([-150.0, -150.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [0, 1], 1],
+    torch.tensor([150.0, 150.0], device=device),
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [2, 3], 0],
+    torch.tensor([-150.0, -150.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [2, 3], 1],
+    torch.tensor([150.0, 150.0], device=device),
+  )
+
+  assert torch.allclose(
+    ideal_actuator.force_limit[1],
+    torch.tensor([150.0, 150.0], device=device),
   )

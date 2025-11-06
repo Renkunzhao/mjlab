@@ -542,3 +542,81 @@ def randomize_pd_gains(
         f"randomize_pd_gains only supports BuiltinPdActuator, XmlPdActuator, "
         f"and IdealPdActuator, got {type(actuator).__name__}"
       )
+
+
+def randomize_effort_limits(
+  env: ManagerBasedEnv,
+  env_ids: torch.Tensor | None,
+  effort_limit_range: Tuple[float, float],
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+  distribution: Literal["uniform", "log_uniform"] = "uniform",
+  operation: Literal["scale", "abs"] = "scale",
+) -> None:
+  """Randomize actuator effort limits.
+
+  Args:
+    env: The environment.
+    env_ids: Environment IDs to randomize. If None, randomizes all environments.
+    effort_limit_range: (min, max) for effort limit randomization.
+    asset_cfg: Asset configuration specifying which entity and actuators.
+    distribution: Distribution type ("uniform" or "log_uniform").
+    operation: "scale" multiplies existing limits, "abs" sets absolute values.
+  """
+  from mjlab.actuator import BuiltinPdActuator, IdealPdActuator, XmlPdActuator
+
+  asset: Entity = env.scene[asset_cfg.name]
+
+  if env_ids is None:
+    env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+  else:
+    env_ids = env_ids.to(env.device, dtype=torch.int)
+
+  if isinstance(asset_cfg.actuator_ids, list):
+    actuators = [asset.actuators[i] for i in asset_cfg.actuator_ids]
+  else:
+    actuators = asset.actuators[asset_cfg.actuator_ids]
+
+  if not isinstance(actuators, list):
+    actuators = [actuators]
+
+  for actuator in actuators:
+    ctrl_ids = actuator.ctrl_ids
+    num_actuators = len(ctrl_ids)
+
+    effort_samples = _sample_distribution(
+      distribution,
+      torch.tensor(effort_limit_range[0], device=env.device),
+      torch.tensor(effort_limit_range[1], device=env.device),
+      (len(env_ids), num_actuators),
+      env.device,
+    )
+
+    if isinstance(actuator, (BuiltinPdActuator, XmlPdActuator)):
+      if operation == "scale":
+        env.sim.model.actuator_forcerange[env_ids[:, None], ctrl_ids, 0] *= (
+          effort_samples
+        )
+        env.sim.model.actuator_forcerange[env_ids[:, None], ctrl_ids, 1] *= (
+          effort_samples
+        )
+      elif operation == "abs":
+        env.sim.model.actuator_forcerange[
+          env_ids[:, None], ctrl_ids, 0
+        ] = -effort_samples
+        env.sim.model.actuator_forcerange[env_ids[:, None], ctrl_ids, 1] = (
+          effort_samples
+        )
+
+    elif isinstance(actuator, IdealPdActuator):
+      assert actuator.force_limit is not None
+      if operation == "scale":
+        current_limit = actuator.force_limit[env_ids].clone()
+        actuator.set_effort_limit(env_ids, effort_limit=current_limit * effort_samples)
+      elif operation == "abs":
+        actuator.set_effort_limit(env_ids, effort_limit=effort_samples)
+
+    else:
+      raise TypeError(
+        f"randomize_effort_limits only supports BuiltinPdActuator, XmlPdActuator, "
+        f"and IdealPdActuator, got {type(actuator).__name__}"
+      )

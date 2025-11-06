@@ -118,7 +118,12 @@ class IdealPdActuator(Actuator):
       .expand(num_envs, -1)
       .clone()
     )
-    self.force_limit = torch.tensor(force_limit_list, dtype=torch.float, device=device)
+    self.force_limit = (
+      torch.tensor(force_limit_list, dtype=torch.float, device=device)
+      .unsqueeze(0)
+      .expand(num_envs, -1)
+      .clone()
+    )
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     assert self.stiffness is not None
@@ -161,3 +166,18 @@ class IdealPdActuator(Actuator):
       if kd.ndim == 1:
         kd = kd.unsqueeze(-1)
       self.damping[env_ids] = kd
+
+  def set_effort_limit(
+    self, env_ids: torch.Tensor | slice, effort_limit: torch.Tensor
+  ) -> None:
+    """Set effort limits for specified environments.
+
+    Args:
+      env_ids: Environment indices to update.
+      effort_limit: New effort limits. Shape: (num_envs, num_actuators) or (num_envs,).
+    """
+    assert self.force_limit is not None
+
+    if effort_limit.ndim == 1:
+      effort_limit = effort_limit.unsqueeze(-1)
+    self.force_limit[env_ids] = effort_limit
