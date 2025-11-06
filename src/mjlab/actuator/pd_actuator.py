@@ -105,8 +105,19 @@ class IdealPdActuator(Actuator):
     damping_list = resolve_param_to_list(self.cfg.damping, self._joint_names)
     force_limit_list = resolve_param_to_list(self.cfg.effort_limit, self._joint_names)
 
-    self.stiffness = torch.tensor(stiffness_list, dtype=torch.float, device=device)
-    self.damping = torch.tensor(damping_list, dtype=torch.float, device=device)
+    num_envs = data.nworld
+    self.stiffness = (
+      torch.tensor(stiffness_list, dtype=torch.float, device=device)
+      .unsqueeze(0)
+      .expand(num_envs, -1)
+      .clone()
+    )
+    self.damping = (
+      torch.tensor(damping_list, dtype=torch.float, device=device)
+      .unsqueeze(0)
+      .expand(num_envs, -1)
+      .clone()
+    )
     self.force_limit = torch.tensor(force_limit_list, dtype=torch.float, device=device)
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
@@ -122,3 +133,31 @@ class IdealPdActuator(Actuator):
     computed_torques += cmd.effort_target
 
     return torch.clamp(computed_torques, -self.force_limit, self.force_limit)
+
+  def set_gains(
+    self,
+    env_ids: torch.Tensor | slice,
+    kp: torch.Tensor | None = None,
+    kd: torch.Tensor | None = None,
+  ) -> None:
+    """Set PD gains for specified environments.
+
+    Args:
+      env_ids: Environment indices to update.
+      kp: New proportional gains. Shape: (num_envs, num_actuators) or (num_envs,).
+      kd: New derivative gains. Shape: (num_envs, num_actuators) or (num_envs,).
+    """
+    assert self.stiffness is not None
+    assert self.damping is not None
+
+    if kp is not None:
+      # Handle broadcasting if kp is 1D.
+      if kp.ndim == 1:
+        kp = kp.unsqueeze(-1)
+      self.stiffness[env_ids] = kp
+
+    if kd is not None:
+      # Handle broadcasting if kd is 1D.
+      if kd.ndim == 1:
+        kd = kd.unsqueeze(-1)
+      self.damping[env_ids] = kd
