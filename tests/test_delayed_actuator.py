@@ -169,5 +169,79 @@ def test_delayed_actuator_reset(device):
   # Check that delay buffer was reset for env 0.
   actuator = entity.actuators[0]
   assert isinstance(actuator, DelayedActuator)
-  assert actuator._delay_buffer is not None
-  assert actuator._delay_buffer.current_lags[0] == 0
+  assert len(actuator._delay_buffers) > 0
+  delay_buffer = next(iter(actuator._delay_buffers.values()))
+  assert delay_buffer.current_lags[0] == 0
+
+
+def test_delayed_actuator_multi_target(device):
+  """Test that multiple targets can be delayed simultaneously."""
+  cfg = EntityCfg(
+    spec_fn=lambda: mujoco.MjSpec.from_string(ROBOT_XML),
+    articulation=EntityArticulationInfoCfg(
+      actuators=(
+        DelayedActuatorCfg(
+          joint_names_expr=["joint.*"],
+          base_cfg=IdealPdActuatorCfg(
+            joint_names_expr=["joint.*"],
+            effort_limit=100.0,
+            stiffness=80.0,
+            damping=10.0,
+          ),
+          delay_target=("position", "velocity", "effort"),
+          delay_min_lag=2,
+          delay_max_lag=2,
+        ),
+      )
+    ),
+  )
+
+  entity = Entity(cfg)
+  model = entity.compile()
+  sim_cfg = SimulationCfg()
+  sim = Simulation(num_envs=1, cfg=sim_cfg, model=model, device=device)
+  entity.initialize(model, sim.model, sim.data, device)
+
+  actuator = entity.actuators[0]
+  assert isinstance(actuator, DelayedActuator)
+  # Should have 3 delay buffers (one for each target).
+  assert len(actuator._delay_buffers) == 3
+  assert "position" in actuator._delay_buffers
+  assert "velocity" in actuator._delay_buffers
+  assert "effort" in actuator._delay_buffers
+
+  # Initialize joints at zero.
+  joint_pos = torch.zeros(1, 2, device=device)
+  joint_vel = torch.zeros(1, 2, device=device)
+  entity.write_joint_state_to_sim(joint_pos, joint_vel)
+
+  # Set different targets over 3 steps.
+  targets = [
+    (
+      torch.tensor([[0.1, 0.2]], device=device),
+      torch.tensor([[0.01, 0.02]], device=device),
+    ),
+    (
+      torch.tensor([[0.3, 0.4]], device=device),
+      torch.tensor([[0.03, 0.04]], device=device),
+    ),
+    (
+      torch.tensor([[0.5, 0.6]], device=device),
+      torch.tensor([[0.05, 0.06]], device=device),
+    ),
+  ]
+
+  for pos_target, vel_target in targets:
+    entity.set_joint_position_target(pos_target)
+    entity.set_joint_velocity_target(vel_target)
+    entity.set_joint_effort_target(torch.zeros(1, 2, device=device))
+    entity.write_data_to_sim()
+
+  # After 3 steps with lag=2, the delayed targets should be from step 0.
+  # Position: [0.1, 0.2], Velocity: [0.01, 0.02]
+  # Expected torque: Kp*(0.1 - 0) + Kd*(0.01 - 0) = 80*0.1 + 10*0.01 = 8.1.
+  ctrl_ids = actuator.ctrl_ids
+  ctrl = sim.data.ctrl[0, ctrl_ids]
+  # [80*0.1 + 10*0.01, 80*0.2 + 10*0.02]
+  expected = torch.tensor([8.1, 16.2], device=device)
+  assert torch.allclose(ctrl, expected, atol=1e-4)

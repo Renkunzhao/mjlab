@@ -34,8 +34,15 @@ class DelayedActuatorCfg(ActuatorCfg):
   base_cfg: ActuatorCfg
   """Configuration for the underlying actuator."""
 
-  delay_target: Literal["position", "velocity", "effort"] = "position"
-  """Which command target to delay: 'position', 'velocity', or 'effort'."""
+  delay_target: (
+    Literal["position", "velocity", "effort"]
+    | tuple[Literal["position", "velocity", "effort"], ...]
+  ) = "position"
+  """Which command target(s) to delay.
+
+  Can be a single string like 'position', or a tuple of strings like
+  ('position', 'velocity', 'effort') to delay multiple targets together.
+  """
 
   delay_min_lag: int = 0
   """Minimum delay lag in physics timesteps."""
@@ -62,7 +69,7 @@ class DelayedActuatorCfg(ActuatorCfg):
 class DelayedActuator(Actuator):
   """Generic wrapper that adds delay to any actuator.
 
-  Delays the specified command target (position, velocity, or effort)
+  Delays the specified command target(s) (position, velocity, and/or effort)
   before passing it to the underlying actuator's compute method.
   """
 
@@ -74,7 +81,7 @@ class DelayedActuator(Actuator):
     )
     self.cfg = cfg
     self._base_actuator = base_actuator
-    self._delay_buffer: DelayBuffer | None = None
+    self._delay_buffers: dict[str, DelayBuffer] = {}
 
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
     self._base_actuator.edit_spec(spec, joint_names)
@@ -92,55 +99,54 @@ class DelayedActuator(Actuator):
     self._joint_ids = self._base_actuator._joint_ids
     self._ctrl_ids = self._base_actuator._ctrl_ids
 
-    self._delay_buffer = DelayBuffer(
-      min_lag=self.cfg.delay_min_lag,
-      max_lag=self.cfg.delay_max_lag,
-      batch_size=data.nworld,
-      device=device,
-      hold_prob=self.cfg.delay_hold_prob,
-      update_period=self.cfg.delay_update_period,
-      per_env_phase=self.cfg.delay_per_env_phase,
+    targets = (
+      (self.cfg.delay_target,)
+      if isinstance(self.cfg.delay_target, str)
+      else self.cfg.delay_target
     )
 
+    # Create independent delay buffer for each target.
+    for target in targets:
+      self._delay_buffers[target] = DelayBuffer(
+        min_lag=self.cfg.delay_min_lag,
+        max_lag=self.cfg.delay_max_lag,
+        batch_size=data.nworld,
+        device=device,
+        hold_prob=self.cfg.delay_hold_prob,
+        update_period=self.cfg.delay_update_period,
+        per_env_phase=self.cfg.delay_per_env_phase,
+      )
+
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
-    assert self._delay_buffer is not None
+    position_target = cmd.position_target
+    velocity_target = cmd.velocity_target
+    effort_target = cmd.effort_target
 
-    if self.cfg.delay_target == "position":
-      self._delay_buffer.append(cmd.position_target)
-      delayed_target = self._delay_buffer.compute()
-      cmd = ActuatorCmd(
-        position_target=delayed_target,
-        velocity_target=cmd.velocity_target,
-        effort_target=cmd.effort_target,
-        joint_pos=cmd.joint_pos,
-        joint_vel=cmd.joint_vel,
-      )
-    elif self.cfg.delay_target == "velocity":
-      self._delay_buffer.append(cmd.velocity_target)
-      delayed_target = self._delay_buffer.compute()
-      cmd = ActuatorCmd(
-        position_target=cmd.position_target,
-        velocity_target=delayed_target,
-        effort_target=cmd.effort_target,
-        joint_pos=cmd.joint_pos,
-        joint_vel=cmd.joint_vel,
-      )
-    elif self.cfg.delay_target == "effort":
-      self._delay_buffer.append(cmd.effort_target)
-      delayed_target = self._delay_buffer.compute()
-      cmd = ActuatorCmd(
-        position_target=cmd.position_target,
-        velocity_target=cmd.velocity_target,
-        effort_target=delayed_target,
-        joint_pos=cmd.joint_pos,
-        joint_vel=cmd.joint_vel,
-      )
+    if "position" in self._delay_buffers:
+      self._delay_buffers["position"].append(cmd.position_target)
+      position_target = self._delay_buffers["position"].compute()
 
-    return self._base_actuator.compute(cmd)
+    if "velocity" in self._delay_buffers:
+      self._delay_buffers["velocity"].append(cmd.velocity_target)
+      velocity_target = self._delay_buffers["velocity"].compute()
+
+    if "effort" in self._delay_buffers:
+      self._delay_buffers["effort"].append(cmd.effort_target)
+      effort_target = self._delay_buffers["effort"].compute()
+
+    delayed_cmd = ActuatorCmd(
+      position_target=position_target,
+      velocity_target=velocity_target,
+      effort_target=effort_target,
+      joint_pos=cmd.joint_pos,
+      joint_vel=cmd.joint_vel,
+    )
+
+    return self._base_actuator.compute(delayed_cmd)
 
   def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
-    if self._delay_buffer is not None:
-      self._delay_buffer.reset(env_ids)
+    for buffer in self._delay_buffers.values():
+      buffer.reset(env_ids)
     self._base_actuator.reset(env_ids)
 
   def update(self, dt: float) -> None:
