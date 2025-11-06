@@ -282,8 +282,7 @@ for a in G1_ARTICULATION.actuators:
   e = a.effort_limit
   s = a.stiffness
   names = a.joint_names_expr
-  if e is None:
-    continue  # Skip actuators without effort limits.
+  assert e is not None
   if not isinstance(e, dict):
     e = {n: e for n in names}
   if not isinstance(s, dict):
