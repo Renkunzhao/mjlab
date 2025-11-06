@@ -1,3 +1,5 @@
+"""Base actuator interface."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -156,21 +158,3 @@ class Actuator(ABC):
       dt: Time step in seconds.
     """
     del dt  # Unused.
-
-
-def resolve_param_to_list(
-  param: float | dict[str, float], joint_names: list[str]
-) -> list[float]:
-  """Convert a parameter (float or dict) to a list matching joint order.
-
-  Args:
-    param: Either a single float value or a dict mapping joint names to values.
-    joint_names: Ordered list of joint names.
-
-  Returns:
-    List of parameter values in the same order as joint_names.
-  """
-  if isinstance(param, dict):
-    return [param.get(name, 0.0) for name in joint_names]
-  else:
-    return [param] * len(joint_names)

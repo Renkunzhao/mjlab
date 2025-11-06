@@ -1,4 +1,12 @@
-"""Explicit PD-control actuator."""
+"""Ideal torque-controlled actuator model.
+
+This module provides an explicit PD controller that computes torques explicitly
+using the standard PD control law: τ = Kp*(q_target - q) + Kd*(v_target - v).
+
+Unlike builtin_actuator.py which uses MuJoCo's internal PD implementation, this
+computes control signals explicitly, allowing the user to modify or extend the
+actuation model more easily.
+"""
 
 from __future__ import annotations
 
@@ -9,13 +17,9 @@ import mujoco
 import mujoco_warp as mjwarp
 import torch
 
-from mjlab.actuator.actuator import (
-  Actuator,
-  ActuatorCfg,
-  ActuatorCmd,
-  resolve_param_to_list,
-)
+from mjlab.actuator.actuator import Actuator, ActuatorCfg, ActuatorCmd
 from mjlab.utils.spec import create_motor_actuator
+from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -23,7 +27,13 @@ if TYPE_CHECKING:
 
 @dataclass(kw_only=True)
 class IdealPdActuatorCfg(ActuatorCfg):
-  """Configuration for ideal PD control actuator."""
+  """Configuration for ideal PD actuator.
+
+  All parameters can be specified as a single float (broadcast to all joints)
+  or a dict mapping joint names/regex patterns to values. When using a dict,
+  all patterns must match at least one joint, and each joint must match exactly
+  one pattern, or a ValueError will be raised.
+  """
 
   stiffness: float | dict[str, float]
   """PD stiffness (proportional gain)."""
@@ -33,8 +43,13 @@ class IdealPdActuatorCfg(ActuatorCfg):
   """Maximum force/torque limit."""
   armature: float | dict[str, float] = 0.0
   """Reflected rotor inertia."""
-  stiction: float | dict[str, float] = 0.0
-  """Joint friction loss."""
+  frictionloss: float | dict[str, float] = 0.0
+  """Friction loss force limit.
+
+  Applies a constant friction force opposing motion, independent of load or velocity.
+  Acts as a constraint that opposes motion before it starts, rather than a velocity-
+  dependent damping force. Also known as dry friction or load-independent friction.
+  """
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
@@ -43,11 +58,7 @@ class IdealPdActuatorCfg(ActuatorCfg):
 
 
 class IdealPdActuator(Actuator):
-  """Ideal PD control actuator.
-
-  Unlike the builtin MuJoCo PD actuator, this class explicitly computes the torques
-  using the PD control law and forwards them to a torque pass-through motor actuator.
-  """
+  """Ideal PD control actuator."""
 
   cfg: IdealPdActuatorCfg
 
@@ -67,7 +78,7 @@ class IdealPdActuator(Actuator):
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
     # Resolve parameters to per-joint lists.
     armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    stiction = resolve_param_to_list(self.cfg.stiction, joint_names)
+    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
     effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
 
     # Add <motor> actuator to spec, one per joint.
@@ -77,7 +88,7 @@ class IdealPdActuator(Actuator):
         joint_name,
         effort_limit=effort_limit[i],
         armature=armature[i],
-        stiction=stiction[i],
+        frictionloss=frictionloss[i],
       )
       self._actuator_specs.append(actuator)
 

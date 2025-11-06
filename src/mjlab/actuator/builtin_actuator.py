@@ -1,3 +1,10 @@
+"""MuJoCo built-in actuators.
+
+This module provides actuators that use MuJoCo's native actuator implementations,
+created programmatically via the MjSpec API. These actuators leverage MuJoCo's
+internal control implementations (position, motor, etc.).
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,13 +13,9 @@ from typing import TYPE_CHECKING
 import mujoco
 import torch
 
-from mjlab.actuator.actuator import (
-  Actuator,
-  ActuatorCfg,
-  ActuatorCmd,
-  resolve_param_to_list,
-)
+from mjlab.actuator.actuator import Actuator, ActuatorCfg, ActuatorCmd
 from mjlab.utils.spec import create_motor_actuator, create_position_actuator
+from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -23,7 +26,13 @@ class BuiltinPdActuatorCfg(ActuatorCfg):
   """Configuration for MuJoCo built-in PD actuator.
 
   All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/patterns to values.
+  or a dict mapping joint names/regex patterns to values. When using a dict,
+  all patterns must match at least one joint, and each joint must match exactly
+  one pattern, or a ValueError will be raised.
+
+  Under the hood, this creates a <position> actuator for each joint and sets
+  the stiffness, damping and effort limits accordingly. It also modifies the actuated
+  joint's properties, namely armature and frictionloss.
   """
 
   stiffness: float | dict[str, float]
@@ -32,8 +41,13 @@ class BuiltinPdActuatorCfg(ActuatorCfg):
   """PD derivative gain."""
   armature: float | dict[str, float] = 0.0
   """Reflected rotor inertia."""
-  stiction: float | dict[str, float] = 0.0
-  """Joint friction loss."""
+  frictionloss: float | dict[str, float] = 0.0
+  """Friction loss force limit.
+
+  Applies a constant friction force opposing motion, independent of load or velocity.
+  Acts as a constraint that opposes motion before it starts, rather than a velocity-
+  dependent damping force. Also known as dry friction or load-independent friction.
+  """
   effort_limit: float | dict[str, float] | None = None
   """Maximum actuator force/torque. If None, no limit is applied."""
 
@@ -61,7 +75,7 @@ class BuiltinPdActuator(Actuator):
     stiffness = resolve_param_to_list(self.cfg.stiffness, joint_names)
     damping = resolve_param_to_list(self.cfg.damping, joint_names)
     armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    stiction = resolve_param_to_list(self.cfg.stiction, joint_names)
+    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
     if self.cfg.effort_limit is not None:
       effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
     else:
@@ -76,7 +90,7 @@ class BuiltinPdActuator(Actuator):
         damping=damping[i],
         effort_limit=effort_limit[i],
         armature=armature[i],
-        stiction=stiction[i],
+        frictionloss=frictionloss[i],
       )
       self._actuator_specs.append(actuator)
 
@@ -89,17 +103,28 @@ class BuiltinTorqueActuatorCfg(ActuatorCfg):
   """Configuration for MuJoCo built-in torque actuator.
 
   All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/patterns to values.
+  or a dict mapping joint names/regex patterns to values. When using a dict,
+  all patterns must match at least one joint, and each joint must match exactly
+  one pattern, or a ValueError will be raised.
+
+  Under the hood, this creates a <motor> actuator for each joint and sets
+  its effort limit and gear ratio accordingly. It also modifies the actuated
+  joint's properties, namely armature and frictionloss.
   """
 
-  effort_limit: float | dict[str, float] = float("inf")
+  effort_limit: float | dict[str, float]
   """Maximum actuator effort."""
   gear: float | dict[str, float] = 1.0
   """Actuator gear ratio."""
   armature: float | dict[str, float] = 0.0
   """Reflected rotor inertia."""
-  stiction: float | dict[str, float] = 0.0
-  """Joint friction loss."""
+  frictionloss: float | dict[str, float] = 0.0
+  """Friction loss force limit.
+
+  Applies a constant friction force opposing motion, independent of load or velocity.
+  Acts as a constraint that opposes motion before it starts, rather than a velocity-
+  dependent damping force. Also known as dry friction or load-independent friction.
+  """
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
@@ -108,11 +133,7 @@ class BuiltinTorqueActuatorCfg(ActuatorCfg):
 
 
 class BuiltinTorqueActuator(Actuator):
-  """MuJoCo built-in torque actuator.
-
-  Direct torque/force pass-through with no control law. The control signal
-  is directly applied as joint torque/force, clamped to effort_limit.
-  """
+  """MuJoCo built-in torque actuator."""
 
   def __init__(
     self,
@@ -128,7 +149,7 @@ class BuiltinTorqueActuator(Actuator):
     # Resolve parameters to per-joint lists.
     effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
     armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    stiction = resolve_param_to_list(self.cfg.stiction, joint_names)
+    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
     gear = resolve_param_to_list(self.cfg.gear, joint_names)
 
     # Add <motor> actuator to spec, one per joint.
@@ -139,7 +160,7 @@ class BuiltinTorqueActuator(Actuator):
         effort_limit=effort_limit[i],
         gear=gear[i],
         armature=armature[i],
-        stiction=stiction[i],
+        frictionloss=frictionloss[i],
       )
       self._actuator_specs.append(actuator)
 

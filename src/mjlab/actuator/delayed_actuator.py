@@ -1,4 +1,9 @@
-"""Generic delayed actuator wrapper."""
+"""Generic delayed actuator wrapper.
+
+This module provides a wrapper that adds delay functionality to any actuator.
+Delays commands (position, velocity, or effort) by a specified number of physics
+timesteps, useful for modeling actuator latency and communication delays.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +25,10 @@ if TYPE_CHECKING:
 class DelayedActuatorCfg(ActuatorCfg):
   """Configuration for delayed actuator wrapper.
 
-  Wraps any actuator config to add delay functionality.
+  Wraps any actuator config to add delay functionality. Delays are quantized
+  to physics timesteps (not control timesteps). For example, with 500Hz physics
+  and 50Hz control (decimation=10), a lag of 2 represents a 4ms delay (2 physics
+  steps).
   """
 
   base_cfg: ActuatorCfg
@@ -30,16 +38,16 @@ class DelayedActuatorCfg(ActuatorCfg):
   """Which command target to delay: 'position', 'velocity', or 'effort'."""
 
   delay_min_lag: int = 0
-  """Minimum delay lag in timesteps."""
+  """Minimum delay lag in physics timesteps."""
 
   delay_max_lag: int = 0
-  """Maximum delay lag in timesteps."""
+  """Maximum delay lag in physics timesteps."""
 
   delay_hold_prob: float = 0.0
   """Probability of keeping previous lag when updating."""
 
   delay_update_period: int = 0
-  """Period for updating delays (0 = every step)."""
+  """Period for updating delays in physics timesteps (0 = every step)."""
 
   delay_per_env_phase: bool = True
   """Whether each environment has a different phase offset."""
