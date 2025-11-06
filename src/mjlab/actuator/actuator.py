@@ -73,7 +73,7 @@ class Actuator(ABC):
     self._joint_names = joint_names
     self._joint_ids: torch.Tensor | None = None
     self._ctrl_ids: torch.Tensor | None = None
-    self._actuator_specs: list[mujoco.MjsActuator] = []
+    self._mjs_actuators: list[mujoco.MjsActuator] = []
 
   @property
   def joint_ids(self) -> torch.Tensor:
@@ -120,7 +120,7 @@ class Actuator(ABC):
     self._joint_ids = torch.tensor(
       self._joint_ids_list, dtype=torch.long, device=device
     )
-    ctrl_ids_list = [act.id for act in self._actuator_specs]
+    ctrl_ids_list = [act.id for act in self._mjs_actuators]
     self._ctrl_ids = torch.tensor(ctrl_ids_list, dtype=torch.long, device=device)
 
   @abstractmethod

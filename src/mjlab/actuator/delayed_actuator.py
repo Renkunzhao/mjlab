@@ -78,7 +78,7 @@ class DelayedActuator(Actuator):
 
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
     self._base_actuator.edit_spec(spec, joint_names)
-    self._actuator_specs = self._base_actuator._actuator_specs
+    self._mjs_actuators = self._base_actuator._mjs_actuators
 
   def initialize(
     self,

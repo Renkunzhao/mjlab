@@ -30,7 +30,7 @@ class XmlActuator(Actuator):
           f"No XML actuator found for joint '{joint_name}'. "
           f"XML actuator config expects actuators to already exist in the XML."
         )
-      self._actuator_specs.append(actuator)
+      self._mjs_actuators.append(actuator)
 
   def _find_actuator_for_joint(
     self, spec: mujoco.MjSpec, joint_name: str
@@ -44,7 +44,7 @@ class XmlActuator(Actuator):
 
 @dataclass(kw_only=True)
 class XmlPdActuatorCfg(ActuatorCfg):
-  """Wrap existing XML-defined PD actuators."""
+  """Wrap existing XML-defined <position> actuators."""
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
@@ -53,7 +53,7 @@ class XmlPdActuatorCfg(ActuatorCfg):
 
 
 class XmlPdActuator(XmlActuator):
-  """Wrapper for XML-defined PD actuators."""
+  """Wrapper for XML-defined <position> actuators."""
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     return cmd.position_target
@@ -61,7 +61,7 @@ class XmlPdActuator(XmlActuator):
 
 @dataclass(kw_only=True)
 class XmlTorqueActuatorCfg(ActuatorCfg):
-  """Wrap existing XML-defined torque/motor actuators."""
+  """Wrap existing XML-defined <motor> actuators."""
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
@@ -70,7 +70,24 @@ class XmlTorqueActuatorCfg(ActuatorCfg):
 
 
 class XmlTorqueActuator(XmlActuator):
-  """Wrapper for XML-defined torque/motor actuators."""
+  """Wrapper for XML-defined <motor> actuators."""
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     return cmd.effort_target
+
+
+@dataclass(kw_only=True)
+class XmlVelocityActuatorCfg(ActuatorCfg):
+  """Wrap existing XML-defined <velocity> actuators."""
+
+  def build(
+    self, entity: Entity, joint_ids: list[int], joint_names: list[str]
+  ) -> XmlVelocityActuator:
+    return XmlVelocityActuator(entity, joint_ids, joint_names)
+
+
+class XmlVelocityActuator(XmlActuator):
+  """Wrapper for XML-defined <velocity> actuators."""
+
+  def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
+    return cmd.velocity_target

@@ -90,7 +90,7 @@ class IdealPdActuator(Actuator):
         armature=armature[i],
         frictionloss=frictionloss[i],
       )
-      self._actuator_specs.append(actuator)
+      self._mjs_actuators.append(actuator)
 
   def initialize(
     self,

@@ -14,7 +14,11 @@ import mujoco
 import torch
 
 from mjlab.actuator.actuator import Actuator, ActuatorCfg, ActuatorCmd
-from mjlab.utils.spec import create_motor_actuator, create_position_actuator
+from mjlab.utils.spec import (
+  create_motor_actuator,
+  create_position_actuator,
+  create_velocity_actuator,
+)
 from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
@@ -92,7 +96,7 @@ class BuiltinPdActuator(Actuator):
         armature=armature[i],
         frictionloss=frictionloss[i],
       )
-      self._actuator_specs.append(actuator)
+      self._mjs_actuators.append(actuator)
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     return cmd.position_target
@@ -162,7 +166,80 @@ class BuiltinTorqueActuator(Actuator):
         armature=armature[i],
         frictionloss=frictionloss[i],
       )
-      self._actuator_specs.append(actuator)
+      self._mjs_actuators.append(actuator)
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     return cmd.effort_target
+
+
+@dataclass(kw_only=True)
+class BuiltinVelocityActuatorCfg(ActuatorCfg):
+  """Configuration for MuJoCo built-in velocity actuator.
+
+  All parameters can be specified as a single float (broadcast to all joints)
+  or a dict mapping joint names/regex patterns to values. When using a dict,
+  all patterns must match at least one joint, and each joint must match exactly
+  one pattern, or a ValueError will be raised.
+
+  Under the hood, this creates a <velocity> actuator for each joint and sets
+  the damping gain. It also modifies the actuated joint's properties, namely
+  armature and frictionloss.
+  """
+
+  damping: float | dict[str, float]
+  """Damping gain."""
+  armature: float | dict[str, float] = 0.0
+  """Reflected rotor inertia."""
+  frictionloss: float | dict[str, float] = 0.0
+  """Friction loss force limit.
+
+  Applies a constant friction force opposing motion, independent of load or velocity.
+  Acts as a constraint that opposes motion before it starts, rather than a velocity-
+  dependent damping force. Also known as dry friction or load-independent friction.
+  """
+  effort_limit: float | dict[str, float] | None = None
+  """Maximum actuator force/torque. If None, no limit is applied."""
+
+  def build(
+    self, entity: Entity, joint_ids: list[int], joint_names: list[str]
+  ) -> BuiltinVelocityActuator:
+    return BuiltinVelocityActuator(self, entity, joint_ids, joint_names)
+
+
+class BuiltinVelocityActuator(Actuator):
+  """MuJoCo built-in velocity actuator."""
+
+  def __init__(
+    self,
+    cfg: BuiltinVelocityActuatorCfg,
+    entity: Entity,
+    joint_ids: list[int],
+    joint_names: list[str],
+  ) -> None:
+    super().__init__(entity, joint_ids, joint_names)
+    self.cfg = cfg
+
+  def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
+    # Resolve parameters to per-joint lists.
+    damping = resolve_param_to_list(self.cfg.damping, joint_names)
+    armature = resolve_param_to_list(self.cfg.armature, joint_names)
+    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
+    if self.cfg.effort_limit is not None:
+      effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
+    else:
+      effort_limit = [None] * len(joint_names)
+
+    # Add <velocity> actuator to spec, one per joint.
+    for i, joint_name in enumerate(joint_names):
+      actuator = create_velocity_actuator(
+        spec,
+        joint_name,
+        damping=damping[i],
+        effort_limit=effort_limit[i],
+        armature=armature[i],
+        frictionloss=frictionloss[i],
+      )
+      self._mjs_actuators.append(actuator)
+
+  def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
+    return cmd.velocity_target

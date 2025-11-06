@@ -168,19 +168,6 @@ class EntityData:
     global_ctrl_ids = self.indexing.ctrl_ids[local_ctrl_ids]
     self.data.ctrl[env_ids, global_ctrl_ids] = ctrl
 
-  def write_qfrc_applied(
-    self,
-    effort: torch.Tensor,
-    target_indices: torch.Tensor,
-    env_ids: torch.Tensor | slice | None = None,
-  ) -> None:
-    if not self.is_actuated:
-      raise ValueError("Cannot write actuator effort for non-actuated entity.")
-
-    env_ids = self._resolve_env_ids(env_ids)
-    v_indices = self.indexing.joint_v_adr[target_indices]
-    self.data.qfrc_applied[env_ids, v_indices] = effort
-
   def write_mocap_pose(
     self, pose: torch.Tensor, env_ids: torch.Tensor | slice | None = None
   ) -> None:
