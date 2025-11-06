@@ -102,9 +102,12 @@ class IdealPdActuator(Actuator):
     assert self.stiffness is not None
     assert self.damping is not None
     assert self.force_limit is not None
+
     pos_error = cmd.position_target - cmd.joint_pos
     vel_error = cmd.velocity_target - cmd.joint_vel
+
     computed_torques = self.stiffness * pos_error
     computed_torques += self.damping * vel_error
     computed_torques += cmd.effort_target
+
     return torch.clamp(computed_torques, -self.force_limit, self.force_limit)

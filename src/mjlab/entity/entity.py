@@ -125,6 +125,7 @@ class Entity:
     if all_joints and all_joints[0].type == mujoco.mjtJoint.mjJNT_FREE:
       self._free_joint = all_joints[0]
       self._non_free_joints = tuple(all_joints[1:])
+    self._actuators: list[actuator.Actuator] = []
 
     self._apply_spec_editors()
     self._add_actuators()
@@ -142,29 +143,19 @@ class Entity:
         cfg.edit_spec(self._spec)
 
   def _add_actuators(self) -> None:
-    """Add actuators to the entity."""
-    # Should we parse existing XML-defined actuators here?
-
-    self.actuators: list[actuator.Actuator] = []
     if self.cfg.articulation is None:
       return
 
     for actuator_cfg in self.cfg.articulation.actuators:
-      # Find joints matching this actuator config.
       joint_ids, joint_names = self.find_joints(actuator_cfg.joint_names_expr)
       if len(joint_names) == 0:
         raise ValueError(
           "No joints found for actuator with expressions: "
           f"{actuator_cfg.joint_names_expr}"
         )
-
-      # Build actuator instance, passing resolved joint info.
       actuator_instance = actuator_cfg.build(self, joint_ids, joint_names)
-
-      # Let actuator edit the spec.
       actuator_instance.edit_spec(self._spec, joint_names)
-
-      self.actuators.append(actuator_instance)
+      self._actuators.append(actuator_instance)
 
   def _add_initial_state_keyframe(self) -> None:
     qpos_components = []
@@ -207,7 +198,7 @@ class Entity:
   @property
   def is_actuated(self) -> bool:
     """Entity has actuated joints."""
-    return len(self.actuators) > 0
+    return len(self._actuators) > 0
 
   @property
   def is_mocap(self) -> bool:
@@ -221,6 +212,10 @@ class Entity:
   @property
   def data(self) -> EntityData:
     return self._data
+
+  @property
+  def actuators(self) -> list[actuator.Actuator]:
+    return self._actuators
 
   @property
   def joint_names(self) -> list[str]:
@@ -338,7 +333,7 @@ class Entity:
     self.indexing = indexing
     nworld = data.nworld
 
-    for act in self.actuators:
+    for act in self._actuators:
       act.initialize(mj_model, model, data, device)
 
     # Root state.
@@ -434,13 +429,13 @@ class Entity:
     )
 
   def update(self, dt: float) -> None:
-    for act in self.actuators:
+    for act in self._actuators:
       act.update(dt)
 
   def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
     self.clear_state(env_ids)
 
-    for act in self.actuators:
+    for act in self._actuators:
       act.reset(env_ids)
 
   def write_data_to_sim(self) -> None:
@@ -716,7 +711,7 @@ class Entity:
     )
 
   def _apply_actuator_controls(self) -> None:
-    for act in self.actuators:
+    for act in self._actuators:
       command = actuator.ActuatorCmd(
         position_target=self._data.joint_pos_target[:, act.joint_ids],
         velocity_target=self._data.joint_vel_target[:, act.joint_ids],
