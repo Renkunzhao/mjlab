@@ -5,7 +5,7 @@ from pathlib import Path
 import mujoco
 
 from mjlab import MJLAB_SRC_PATH
-from mjlab.actuator import BuiltinPdActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.actuator import ElectricActuator, reflected_inertia
 from mjlab.utils.os import update_assets
@@ -66,14 +66,14 @@ DAMPING_HIP = 2 * DAMPING_RATIO * HIP_ACTUATOR.reflected_inertia * NATURAL_FREQ
 STIFFNESS_KNEE = KNEE_ACTUATOR.reflected_inertia * NATURAL_FREQ**2
 DAMPING_KNEE = 2 * DAMPING_RATIO * KNEE_ACTUATOR.reflected_inertia * NATURAL_FREQ
 
-GO1_HIP_ACTUATOR_CFG = BuiltinPdActuatorCfg(
+GO1_HIP_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
   joint_names_expr=[".*_hip_joint", ".*_thigh_joint"],
   stiffness=STIFFNESS_HIP,
   damping=DAMPING_HIP,
   effort_limit=HIP_ACTUATOR.effort_limit,
   armature=HIP_ACTUATOR.reflected_inertia,
 )
-GO1_KNEE_ACTUATOR_CFG = BuiltinPdActuatorCfg(
+GO1_KNEE_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
   joint_names_expr=[".*_calf_joint"],
   stiffness=STIFFNESS_KNEE,
   damping=DAMPING_KNEE,
@@ -148,18 +148,13 @@ GO1_ROBOT_CFG = EntityCfg(
 
 GO1_ACTION_SCALE: dict[str, float] = {}
 for a in GO1_ARTICULATION.actuators:
-  assert isinstance(a, BuiltinPdActuatorCfg)
+  assert isinstance(a, BuiltinPositionActuatorCfg)
   e = a.effort_limit
   s = a.stiffness
   names = a.joint_names_expr
   assert e is not None
-  if not isinstance(e, dict):
-    e = {n: e for n in names}
-  if not isinstance(s, dict):
-    s = {n: s for n in names}
   for n in names:
-    if n in e and n in s and s[n]:
-      GO1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
+    GO1_ACTION_SCALE[n] = 0.25 * e / s
 
 
 if __name__ == "__main__":

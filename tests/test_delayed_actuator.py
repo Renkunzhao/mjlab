@@ -6,7 +6,7 @@ import torch
 from conftest import get_test_device
 
 from mjlab.actuator import (
-  BuiltinPdActuatorCfg,
+  BuiltinPositionActuatorCfg,
   DelayedActuator,
   DelayedActuatorCfg,
   IdealPdActuatorCfg,
@@ -46,7 +46,7 @@ def create_entity_with_delayed_builtin(delay_min_lag=0, delay_max_lag=3):
       actuators=(
         DelayedActuatorCfg(
           joint_names_expr=["joint.*"],
-          base_cfg=BuiltinPdActuatorCfg(
+          base_cfg=BuiltinPositionActuatorCfg(
             joint_names_expr=["joint.*"],
             effort_limit=100.0,
             stiffness=80.0,

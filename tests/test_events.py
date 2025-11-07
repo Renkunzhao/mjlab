@@ -133,10 +133,10 @@ def test_randomize_pd_gains(device):
 
   mock_entity = Mock()
 
-  builtin_actuator = Mock(spec=actuator.BuiltinPdActuator)
+  builtin_actuator = Mock(spec=actuator.BuiltinPositionActuator)
   builtin_actuator.ctrl_ids = torch.tensor([0, 1], device=device)
 
-  xml_actuator = Mock(spec=actuator.XmlPdActuator)
+  xml_actuator = Mock(spec=actuator.XmlPositionActuator)
   xml_actuator.ctrl_ids = torch.tensor([2, 3], device=device)
 
   ideal_actuator = Mock(spec=actuator.IdealPdActuator)
@@ -259,10 +259,10 @@ def test_randomize_effort_limits(device):
 
   mock_entity = Mock()
 
-  builtin_actuator = Mock(spec=actuator.BuiltinPdActuator)
+  builtin_actuator = Mock(spec=actuator.BuiltinPositionActuator)
   builtin_actuator.ctrl_ids = torch.tensor([0, 1], device=device)
 
-  xml_actuator = Mock(spec=actuator.XmlPdActuator)
+  xml_actuator = Mock(spec=actuator.XmlPositionActuator)
   xml_actuator.ctrl_ids = torch.tensor([2, 3], device=device)
 
   ideal_actuator = Mock(spec=actuator.IdealPdActuator)

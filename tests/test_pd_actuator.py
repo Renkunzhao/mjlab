@@ -5,7 +5,7 @@ import pytest
 import torch
 from conftest import get_test_device
 
-from mjlab.actuator import BuiltinPdActuatorCfg, IdealPdActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg, IdealPdActuatorCfg
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.sim.sim import Simulation, SimulationCfg
 
@@ -60,7 +60,7 @@ def test_ideal_pd_matches_builtin_at_rest(device):
     )
   )
   builtin_entity = create_entity_with_actuator(
-    BuiltinPdActuatorCfg(
+    BuiltinPositionActuatorCfg(
       joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
     )
   )
@@ -100,7 +100,7 @@ def test_ideal_pd_matches_builtin_with_velocity(device):
     )
   )
   builtin_entity = create_entity_with_actuator(
-    BuiltinPdActuatorCfg(
+    BuiltinPositionActuatorCfg(
       joint_names_expr=["joint.*"], effort_limit=100.0, stiffness=kp, damping=kv
     )
   )

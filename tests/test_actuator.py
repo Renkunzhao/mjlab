@@ -6,7 +6,7 @@ import torch
 from conftest import get_test_device
 
 from mjlab.actuator import (
-  BuiltinPdActuatorCfg,
+  BuiltinPositionActuatorCfg,
   IdealPdActuatorCfg,
 )
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
@@ -54,8 +54,8 @@ def initialize_entity(entity, device, num_envs=1):
 
 
 def test_builtin_pd_actuator_compute(device):
-  """BuiltinPdActuator writes position targets to ctrl."""
-  actuator_cfg = BuiltinPdActuatorCfg(
+  """BuiltinPositionActuator writes position targets to ctrl."""
+  actuator_cfg = BuiltinPositionActuatorCfg(
     joint_names_expr=["joint.*"], stiffness=50.0, damping=5.0
   )
   entity = create_entity_with_actuator(actuator_cfg)
@@ -92,7 +92,7 @@ def test_ideal_pd_actuator_compute(device):
 
 def test_targets_cleared_on_reset(device):
   """Entity.reset() zeros all targets."""
-  actuator_cfg = BuiltinPdActuatorCfg(
+  actuator_cfg = BuiltinPositionActuatorCfg(
     joint_names_expr=["joint.*"], stiffness=50.0, damping=5.0
   )
   entity = create_entity_with_actuator(actuator_cfg)

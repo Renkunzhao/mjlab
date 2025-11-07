@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class BuiltinPdActuatorCfg(ActuatorCfg):
-  """Configuration for MuJoCo built-in PD actuator.
+class BuiltinPositionActuatorCfg(ActuatorCfg):
+  """Configuration for MuJoCo built-in position actuator.
 
   Under the hood, this creates a <position> actuator for each joint and sets
   the stiffness, damping and effort limits accordingly. It also modifies the
@@ -41,16 +41,16 @@ class BuiltinPdActuatorCfg(ActuatorCfg):
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> BuiltinPdActuator:
-    return BuiltinPdActuator(self, entity, joint_ids, joint_names)
+  ) -> BuiltinPositionActuator:
+    return BuiltinPositionActuator(self, entity, joint_ids, joint_names)
 
 
-class BuiltinPdActuator(Actuator):
-  """MuJoCo built-in PD actuator."""
+class BuiltinPositionActuator(Actuator):
+  """MuJoCo built-in position actuator."""
 
   def __init__(
     self,
-    cfg: BuiltinPdActuatorCfg,
+    cfg: BuiltinPositionActuatorCfg,
     entity: Entity,
     joint_ids: list[int],
     joint_names: list[str],
@@ -77,8 +77,8 @@ class BuiltinPdActuator(Actuator):
 
 
 @dataclass(kw_only=True)
-class BuiltinTorqueActuatorCfg(ActuatorCfg):
-  """Configuration for MuJoCo built-in torque actuator.
+class BuiltinMotorActuatorCfg(ActuatorCfg):
+  """Configuration for MuJoCo built-in motor actuator.
 
   Under the hood, this creates a <motor> actuator for each joint and sets
   its effort limit and gear ratio accordingly. It also modifies the actuated
@@ -92,16 +92,16 @@ class BuiltinTorqueActuatorCfg(ActuatorCfg):
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> BuiltinTorqueActuator:
-    return BuiltinTorqueActuator(self, entity, joint_ids, joint_names)
+  ) -> BuiltinMotorActuator:
+    return BuiltinMotorActuator(self, entity, joint_ids, joint_names)
 
 
-class BuiltinTorqueActuator(Actuator):
-  """MuJoCo built-in torque actuator."""
+class BuiltinMotorActuator(Actuator):
+  """MuJoCo built-in motor actuator."""
 
   def __init__(
     self,
-    cfg: BuiltinTorqueActuatorCfg,
+    cfg: BuiltinMotorActuatorCfg,
     entity: Entity,
     joint_ids: list[int],
     joint_names: list[str],

@@ -41,16 +41,16 @@ class XmlActuator(Actuator):
 
 
 @dataclass(kw_only=True)
-class XmlPdActuatorCfg(ActuatorCfg):
+class XmlPositionActuatorCfg(ActuatorCfg):
   """Wrap existing XML-defined <position> actuators."""
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> XmlPdActuator:
-    return XmlPdActuator(entity, joint_ids, joint_names)
+  ) -> XmlPositionActuator:
+    return XmlPositionActuator(entity, joint_ids, joint_names)
 
 
-class XmlPdActuator(XmlActuator):
+class XmlPositionActuator(XmlActuator):
   """Wrapper for XML-defined <position> actuators."""
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
@@ -58,16 +58,16 @@ class XmlPdActuator(XmlActuator):
 
 
 @dataclass(kw_only=True)
-class XmlTorqueActuatorCfg(ActuatorCfg):
+class XmlMotorActuatorCfg(ActuatorCfg):
   """Wrap existing XML-defined <motor> actuators."""
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
-  ) -> XmlTorqueActuator:
-    return XmlTorqueActuator(entity, joint_ids, joint_names)
+  ) -> XmlMotorActuator:
+    return XmlMotorActuator(entity, joint_ids, joint_names)
 
 
-class XmlTorqueActuator(XmlActuator):
+class XmlMotorActuator(XmlActuator):
   """Wrapper for XML-defined <motor> actuators."""
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:

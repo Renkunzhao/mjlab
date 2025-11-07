@@ -8,7 +8,7 @@ integrator cannot account for their velocity derivatives).
 
 ## Choosing an Actuator Type
 
-**Built-in actuators** (`BuiltinPdActuator`, `BuiltinVelocityActuator`): Use
+**Built-in actuators** (`BuiltinPositionActuator`, `BuiltinVelocityActuator`): Use
 MuJoCo's native implementations. The physics engine computes torques and
 integrates damping forces implicitly, providing the best numerical stability. 
 
@@ -18,7 +18,7 @@ Use when you need custom control laws or actuator dynamics that
 can't be expressed with built-in types (e.g., velocity-dependent torque
 limits, learned actuator networks).
 
-**XML actuators** (`XmlPdActuator`, `XmlTorqueActuator`,
+**XML actuators** (`XmlPositionActuator`, `XmlMotorActuator`,
 `XmlVelocityActuator`): Wrap actuators already defined in your robot's XML
 file.
 
@@ -30,14 +30,14 @@ delays to any actuator type. Use for modeling communication latency.
 **Basic PD control:**
 
 ```python
-from mjlab.actuator import BuiltinPdActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg
 from mjlab.entity import EntityCfg, EntityArticulationInfoCfg
 
 robot_cfg = EntityCfg(
   spec_fn=lambda: load_robot_spec(),
   articulation=EntityArticulationInfoCfg(
     actuators=(
-      BuiltinPdActuatorCfg(
+      BuiltinPositionActuatorCfg(
         joint_names_expr=[".*_hip_.*", ".*_knee_.*"],
         stiffness=80.0,
         damping=10.0,
@@ -48,28 +48,37 @@ robot_cfg = EntityCfg(
 )
 ```
 
-**Per-joint parameters:**
+**Different parameters for different joint groups:**
 
 ```python
-BuiltinPdActuatorCfg(
-  joint_names_expr=[".*_hip_.*", ".*_knee_.*", ".*_ankle_.*"],
-  stiffness={
-    ".*_hip_.*": 120.0,
-    ".*_knee_.*": 80.0,
-    ".*_ankle_.*": 60.0,
-  },
-  damping=10.0,  # Broadcast to all
+# Use separate actuator configs for different joint groups
+actuators=(
+  BuiltinPositionActuatorCfg(
+    joint_names_expr=[".*_hip_.*"],
+    stiffness=120.0,
+    damping=10.0,
+  ),
+  BuiltinPositionActuatorCfg(
+    joint_names_expr=[".*_knee_.*"],
+    stiffness=80.0,
+    damping=10.0,
+  ),
+  BuiltinPositionActuatorCfg(
+    joint_names_expr=[".*_ankle_.*"],
+    stiffness=60.0,
+    damping=10.0,
+  ),
 )
 ```
 
 **Add delays:**
 
 ```python
-from mjlab.actuator import DelayedActuatorCfg
+from mjlab.actuator import DelayedActuatorCfg, BuiltinPositionActuatorCfg
 
 DelayedActuatorCfg(
   joint_names_expr=[".*"],
-  base_cfg=BuiltinPdActuatorCfg(
+  base_cfg=BuiltinPositionActuatorCfg(
     joint_names_expr=[".*"],
     stiffness=80.0,
     damping=10.0,
@@ -118,18 +127,18 @@ Use MuJoCo's native actuator types via the MjSpec API. The physics engine
 computes the control law and integrates velocity-dependent damping forces
 implicitly, providing best numerical stability.
 
-**BuiltinPdActuator**: Creates `<position>` actuators for PD control. 
+**BuiltinPositionActuator**: Creates `<position>` actuators for PD control.
 
 **BuiltinVelocityActuator**: Creates `<velocity>` actuators for velocity control.
 
-**BuiltinTorqueActuator**: Creates `<motor>` actuators for effort control.
+**BuiltinMotorActuator**: Creates `<motor>` actuators for direct torque control.
 
 ```python
-from mjlab.actuator import BuiltinPdActuatorCfg, BuiltinVelocityActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg, BuiltinVelocityActuatorCfg
 
 # Mobile manipulator: PD for arm joints, velocity control for wheels.
 actuators = (
-  BuiltinPdActuatorCfg(
+  BuiltinPositionActuatorCfg(
     joint_names_expr=[".*_shoulder_.*", ".*_elbow_.*", ".*_wrist_.*"],
     stiffness=100.0,
     damping=10.0,
@@ -203,14 +212,14 @@ existing actuators by matching their `target` joint name against the
 `joint_names_expr` patterns. Each joint must have exactly one matching
 actuator.
 
-**XmlPdActuator**: Wraps existing `<position>` actuators
+**XmlPositionActuator**: Wraps existing `<position>` actuators
 
 **XmlVelocityActuator**: Wraps existing `<velocity>` actuators
 
-**XmlTorqueActuator**: Wraps existing `<motor>` actuators
+**XmlMotorActuator**: Wraps existing `<motor>` actuators
 
 ```python
-from mjlab.actuator import XmlPdActuatorCfg
+from mjlab.actuator import XmlPositionActuatorCfg
 
 # Robot XML already has:
 # <actuator>
@@ -219,7 +228,7 @@ from mjlab.actuator import XmlPdActuatorCfg
 
 # Wrap existing XML actuators by joint name.
 actuators = (
-  XmlPdActuatorCfg(
+  XmlPositionActuatorCfg(
     joint_names_expr=["hip_joint", "knee_joint"],
   ),
 )
@@ -278,7 +287,7 @@ Delays are quantized to physics timesteps. For example, with 500Hz physics
 
 ## Built-in (Implicit) vs. Explicit PD Control
 
-**BuiltinPdActuator** uses MuJoCo's internal PD implementation:
+**BuiltinPositionActuator** uses MuJoCo's internal PD implementation:
 
 - Creates `<position>` actuators in the MjSpec
 - Physics engine computes the PD law and integrates the velocity-dependent
@@ -299,54 +308,38 @@ larger gains and larger timesteps.
 
 ## Configuration
 
-### Per-Joint Parameters
+### Multiple Actuator Configs for Different Joint Groups
 
-All actuator parameters can be specified as:
-
-- **Single value**: Broadcast to all joints
-- **Dict mapping patterns to values**: Fine-grained control per joint group
+Since actuator parameters are uniform within each config, use separate
+actuator configs for joints that need different parameters:
 
 ```python
-# Different stiffness values for hip/knee/ankle, shared damping.
-BuiltinPdActuatorCfg(
-  joint_names_expr=[".*_hip_.*", ".*_knee_.*", ".*_ankle_.*"],
-  stiffness={
-    ".*_hip_.*": 120.0,
-    ".*_knee_.*": 80.0,
-    ".*_ankle_.*": 60.0,
-  },
-  damping=10.0,  # Broadcast to all
-  effort_limit={".*_hip_.*": 150.0, ".*_(knee|ankle)_.*": 100.0},
-)
-```
-
-> **Note**: When using dict mapping, each pattern must match at least one
-> joint, and each joint must match exactly one pattern. Patterns are evaluated
-> independently (not in order), and an error is raised if a joint matches
-> multiple patterns or none.
-
-### Example: G1 Humanoid
-
-```python
-from mjlab.actuator import BuiltinPdActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg
 
 # G1 humanoid with different gains per joint group.
 G1_ACTUATORS = (
-  BuiltinPdActuatorCfg(
+  BuiltinPositionActuatorCfg(
     joint_names_expr=[".*_hip_.*", "waist_yaw_joint"],
-    stiffness={".*_hip_pitch_joint": 200.0, ".*": 180.0},
-    damping={".*_hip_pitch_joint": 20.0, ".*": 18.0},
+    stiffness=180.0,
+    damping=18.0,
     effort_limit=88.0,
     armature=0.0015,
   ),
-  BuiltinPdActuatorCfg(
+  BuiltinPositionActuatorCfg(
+    joint_names_expr=["left_hip_pitch_joint", "right_hip_pitch_joint"],
+    stiffness=200.0,
+    damping=20.0,
+    effort_limit=88.0,
+    armature=0.0015,
+  ),
+  BuiltinPositionActuatorCfg(
     joint_names_expr=[".*_knee_joint"],
     stiffness=150.0,
     damping=15.0,
     effort_limit=139.0,
     armature=0.0025,
   ),
-  BuiltinPdActuatorCfg(
+  BuiltinPositionActuatorCfg(
     joint_names_expr=[".*_ankle_.*"],
     stiffness=40.0,
     damping=5.0,

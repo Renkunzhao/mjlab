@@ -6,7 +6,7 @@ import pytest
 import torch
 from conftest import get_test_device
 
-from mjlab.actuator import BuiltinPdActuatorCfg
+from mjlab.actuator import BuiltinPositionActuatorCfg
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.sim.sim import Simulation, SimulationCfg
 
@@ -97,7 +97,7 @@ def create_fixed_articulated_entity():
     spec_fn=lambda: mujoco.MjSpec.from_string(FIXED_BASE_ARTICULATED_XML),
     articulation=EntityArticulationInfoCfg(
       actuators=(
-        BuiltinPdActuatorCfg(
+        BuiltinPositionActuatorCfg(
           joint_names_expr=["joint1", "joint2"],
           effort_limit=1.0,
           stiffness=1.0,
@@ -115,7 +115,7 @@ def create_floating_articulated_entity():
     spec_fn=lambda: mujoco.MjSpec.from_string(FLOATING_BASE_ARTICULATED_XML),
     articulation=EntityArticulationInfoCfg(
       actuators=(
-        BuiltinPdActuatorCfg(
+        BuiltinPositionActuatorCfg(
           joint_names_expr=["joint1", "joint2"],
           effort_limit=1.0,
           stiffness=1.0,
@@ -346,7 +346,7 @@ def test_keyframe_ctrl_maps_joint_pos_to_actuators():
     spec_fn=lambda: mujoco.MjSpec.from_string(FLOATING_BASE_ARTICULATED_XML),
     articulation=EntityArticulationInfoCfg(
       actuators=(
-        BuiltinPdActuatorCfg(
+        BuiltinPositionActuatorCfg(
           joint_names_expr=["joint1", "joint2"],
           effort_limit=1.0,
           stiffness=1.0,
@@ -369,7 +369,7 @@ def test_keyframe_ctrl_underactuated():
     spec_fn=lambda: mujoco.MjSpec.from_string(FLOATING_BASE_ARTICULATED_XML),
     articulation=EntityArticulationInfoCfg(
       actuators=(
-        BuiltinPdActuatorCfg(
+        BuiltinPositionActuatorCfg(
           joint_names_expr=["joint1"],  # Only one actuator.
           effort_limit=1.0,
           stiffness=1.0,
