@@ -1,8 +1,6 @@
 """Wrappers for XML-defined actuators.
 
 This module provides wrappers for actuators already defined in robot XML/MJCF files.
-These actuators are not created programmatically, but instead reference existing
-actuator definitions from the loaded model.
 """
 
 from __future__ import annotations

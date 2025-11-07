@@ -1,9 +1,4 @@
-"""Generic delayed actuator wrapper.
-
-This module provides a wrapper that adds delay functionality to any actuator.
-Delays commands (position, velocity, or effort) by a specified number of physics
-timesteps, useful for modeling actuator latency and communication delays.
-"""
+"""Generic delayed actuator wrapper."""
 
 from __future__ import annotations
 

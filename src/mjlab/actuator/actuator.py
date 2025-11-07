@@ -22,6 +22,16 @@ class ActuatorCfg(ABC):
   Can be a list of joint names or list of regex expressions.
   """
 
+  armature: float | dict[str, float] = 0.0
+  """Reflected rotor inertia."""
+
+  frictionloss: float | dict[str, float] = 0.0
+  """Friction loss force limit.
+
+  Applies a constant friction force opposing motion, independent of load or velocity.
+  Also known as dry friction or load-independent friction.
+  """
+
   @abstractmethod
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]

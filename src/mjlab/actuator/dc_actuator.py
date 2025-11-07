@@ -1,8 +1,7 @@
 """DC motor actuator with velocity-based saturation model.
 
 This module provides a DC motor actuator that implements a realistic torque-speed
-curve for more accurate motor behavior simulation. The motor produces maximum
-torque at zero velocity and reduces linearly to zero torque at maximum velocity.
+curve for more accurate motor behavior simulation.
 """
 
 from __future__ import annotations

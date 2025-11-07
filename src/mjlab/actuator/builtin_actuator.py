@@ -1,8 +1,7 @@
 """MuJoCo built-in actuators.
 
 This module provides actuators that use MuJoCo's native actuator implementations,
-created programmatically via the MjSpec API. These actuators leverage MuJoCo's
-internal control implementations (position, motor, etc.).
+created programmatically via the MjSpec API.
 """
 
 from __future__ import annotations
@@ -35,23 +34,14 @@ class BuiltinPdActuatorCfg(ActuatorCfg):
   one pattern, or a ValueError will be raised.
 
   Under the hood, this creates a <position> actuator for each joint and sets
-  the stiffness, damping and effort limits accordingly. It also modifies the actuated
-  joint's properties, namely armature and frictionloss.
+  the stiffness, damping and effort limits accordingly. It also modifies the
+  actuated joint's properties, namely armature and frictionloss.
   """
 
   stiffness: float | dict[str, float]
   """PD proportional gain."""
   damping: float | dict[str, float]
   """PD derivative gain."""
-  armature: float | dict[str, float] = 0.0
-  """Reflected rotor inertia."""
-  frictionloss: float | dict[str, float] = 0.0
-  """Friction loss force limit.
-
-  Applies a constant friction force opposing motion, independent of load or velocity.
-  Acts as a constraint that opposes motion before it starts, rather than a velocity-
-  dependent damping force. Also known as dry friction or load-independent friction.
-  """
   effort_limit: float | dict[str, float] | None = None
   """Maximum actuator force/torque. If None, no limit is applied."""
 
@@ -120,15 +110,6 @@ class BuiltinTorqueActuatorCfg(ActuatorCfg):
   """Maximum actuator effort."""
   gear: float | dict[str, float] = 1.0
   """Actuator gear ratio."""
-  armature: float | dict[str, float] = 0.0
-  """Reflected rotor inertia."""
-  frictionloss: float | dict[str, float] = 0.0
-  """Friction loss force limit.
-
-  Applies a constant friction force opposing motion, independent of load or velocity.
-  Acts as a constraint that opposes motion before it starts, rather than a velocity-
-  dependent damping force. Also known as dry friction or load-independent friction.
-  """
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
@@ -188,15 +169,6 @@ class BuiltinVelocityActuatorCfg(ActuatorCfg):
 
   damping: float | dict[str, float]
   """Damping gain."""
-  armature: float | dict[str, float] = 0.0
-  """Reflected rotor inertia."""
-  frictionloss: float | dict[str, float] = 0.0
-  """Friction loss force limit.
-
-  Applies a constant friction force opposing motion, independent of load or velocity.
-  Acts as a constraint that opposes motion before it starts, rather than a velocity-
-  dependent damping force. Also known as dry friction or load-independent friction.
-  """
   effort_limit: float | dict[str, float] | None = None
   """Maximum actuator force/torque. If None, no limit is applied."""
 

@@ -1,8 +1,4 @@
-"""Ideal torque-controlled actuator model.
-
-This module provides a PD controller that computes torques explicitly
-using the standard PD control law: τ = Kp*(q_target - q) + Kd*(v_target - v).
-"""
+"""An ideal PD control actuator."""
 
 from __future__ import annotations
 
@@ -39,15 +35,6 @@ class IdealPdActuatorCfg(ActuatorCfg):
   """PD damping (derivative gain)."""
   effort_limit: float | dict[str, float] = float("inf")
   """Maximum force/torque limit."""
-  armature: float | dict[str, float] = 0.0
-  """Reflected rotor inertia."""
-  frictionloss: float | dict[str, float] = 0.0
-  """Friction loss force limit.
-
-  Applies a constant friction force opposing motion, independent of load or velocity.
-  Acts as a constraint that opposes motion before it starts, rather than a velocity-
-  dependent damping force. Also known as dry friction or load-independent friction.
-  """
 
   def build(
     self, entity: Entity, joint_ids: list[int], joint_names: list[str]
