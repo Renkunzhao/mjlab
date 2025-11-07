@@ -1,17 +1,13 @@
 """Ideal torque-controlled actuator model.
 
-This module provides an explicit PD controller that computes torques explicitly
+This module provides a PD controller that computes torques explicitly
 using the standard PD control law: τ = Kp*(q_target - q) + Kd*(v_target - v).
-
-Unlike builtin_actuator.py which uses MuJoCo's internal PD implementation, this
-computes control signals explicitly, allowing the user to modify or extend the
-actuation model more easily.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import mujoco
 import mujoco_warp as mjwarp
@@ -23,6 +19,8 @@ from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
+
+IdealPdCfgT = TypeVar("IdealPdCfgT", bound="IdealPdActuatorCfg")
 
 
 @dataclass(kw_only=True)
@@ -57,14 +55,12 @@ class IdealPdActuatorCfg(ActuatorCfg):
     return IdealPdActuator(self, entity, joint_ids, joint_names)
 
 
-class IdealPdActuator(Actuator):
+class IdealPdActuator(Actuator, Generic[IdealPdCfgT]):
   """Ideal PD control actuator."""
-
-  cfg: IdealPdActuatorCfg
 
   def __init__(
     self,
-    cfg: IdealPdActuatorCfg,
+    cfg: IdealPdCfgT,
     entity: Entity,
     joint_ids: list[int],
     joint_names: list[str],
@@ -128,7 +124,6 @@ class IdealPdActuator(Actuator):
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     assert self.stiffness is not None
     assert self.damping is not None
-    assert self.force_limit is not None
 
     pos_error = cmd.position_target - cmd.joint_pos
     vel_error = cmd.velocity_target - cmd.joint_vel
@@ -137,7 +132,11 @@ class IdealPdActuator(Actuator):
     computed_torques += self.damping * vel_error
     computed_torques += cmd.effort_target
 
-    return torch.clamp(computed_torques, -self.force_limit, self.force_limit)
+    return self._clip_effort(computed_torques)
+
+  def _clip_effort(self, effort: torch.Tensor) -> torch.Tensor:
+    assert self.force_limit is not None
+    return torch.clamp(effort, -self.force_limit, self.force_limit)
 
   def set_gains(
     self,
@@ -156,13 +155,11 @@ class IdealPdActuator(Actuator):
     assert self.damping is not None
 
     if kp is not None:
-      # Handle broadcasting if kp is 1D.
       if kp.ndim == 1:
         kp = kp.unsqueeze(-1)
       self.stiffness[env_ids] = kp
 
     if kd is not None:
-      # Handle broadcasting if kd is 1D.
       if kd.ndim == 1:
         kd = kd.unsqueeze(-1)
       self.damping[env_ids] = kd
