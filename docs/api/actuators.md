@@ -1,7 +1,7 @@
 # Actuators
 
 Actuators convert high-level commands (position, velocity, effort) into
-low-level control signals that drive joints. Implementations use either
+low-level efforts that drive joints. Implementations use either
 built-in actuators (physics engine computes torques and integrates damping
 forces implicitly) or explicit actuators (user computes torques explicitly,
 integrator cannot account for their velocity derivatives).
@@ -10,9 +10,9 @@ integrator cannot account for their velocity derivatives).
 
 **Built-in actuators** (`BuiltinPositionActuator`, `BuiltinVelocityActuator`): Use
 MuJoCo's native implementations. The physics engine computes torques and
-integrates damping forces implicitly, providing the best numerical stability. 
+integrates damping forces implicitly, providing the best numerical stability.
 
-**Explicit actuators** (`IdealPdActuator`, `DcMotorActuator`): User computes
+**Explicit actuators** (`IdealPdActuator`, `DcMotorActuator`): Compute
 torques explicitly so the simulator cannot account for velocity derivatives.
 Use when you need custom control laws or actuator dynamics that
 can't be expressed with built-in types (e.g., velocity-dependent torque
@@ -48,29 +48,6 @@ robot_cfg = EntityCfg(
 )
 ```
 
-**Different parameters for different joint groups:**
-
-```python
-# Use separate actuator configs for different joint groups
-actuators=(
-  BuiltinPositionActuatorCfg(
-    joint_names_expr=[".*_hip_.*"],
-    stiffness=120.0,
-    damping=10.0,
-  ),
-  BuiltinPositionActuatorCfg(
-    joint_names_expr=[".*_knee_.*"],
-    stiffness=80.0,
-    damping=10.0,
-  ),
-  BuiltinPositionActuatorCfg(
-    joint_names_expr=[".*_ankle_.*"],
-    stiffness=60.0,
-    damping=10.0,
-  ),
-)
-```
-
 **Add delays:**
 
 ```python
@@ -93,8 +70,9 @@ DelayedActuatorCfg(
 
 All actuators implement a unified `compute()` interface that receives an
 `ActuatorCmd` (containing position, velocity, and effort targets) and returns
-control signals. The abstraction provides lifecycle hooks for model
-modification, initialization, reset, and runtime updates.
+control signals for the low-level MuJoCo actuators driving each joint. The
+abstraction provides lifecycle hooks for model modification, initialization,
+reset, and runtime updates.
 
 **Core interface:**
 
@@ -123,8 +101,8 @@ def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
 
 ### Built-in Actuators
 
-Use MuJoCo's native actuator types via the MjSpec API. The physics engine
-computes the control law and integrates velocity-dependent damping forces
+Built-in actuators use MuJoCo's native actuator types via the MjSpec API. The physics
+engine computes the control law and integrates velocity-dependent damping forces
 implicitly, providing best numerical stability.
 
 **BuiltinPositionActuator**: Creates `<position>` actuators for PD control.
@@ -154,15 +132,14 @@ actuators = (
 
 ### Explicit Actuators
 
-User computes torques explicitly. This enables custom control laws and actuator
-dynamics that can't be expressed with built-in types (e.g., velocity-dependent torque
-limits, learned actuator networks).
+These actuators explicitly compute efforts and forward them to an underlying <motor>
+actuator acting as a passthrough. This enables custom control laws and actuator
+dynamics that can't be expressed with built-in types.
 
 > **⚠️ Stability warning**: Explicit actuators may be less numerically stable
 > than built-in actuators because the integrator cannot account for the
 > velocity derivatives of the control forces, especially with high damping
-> gains. See [Numerical Stability: Built-in vs.
-> Explicit](#numerical-stability-built-in-vs-explicit) for details.
+gains.
 
 **IdealPdActuator**: Base class that implements an ideal PD controller.
 
@@ -200,16 +177,11 @@ actuators = (
 - **`velocity_limit`**: Maximum motor velocity (no-load speed, *rad/s*)
 - **`effort_limit`**: Continuous torque limit (from base class)
 
-The actuator computes torque limits based on current joint velocity. At zero
-velocity, it can produce full `saturation_effort`. At `velocity_limit`, it
-produces zero torque. Between these points, torque varies linearly. The
-`effort_limit` further constrains output below the torque-speed curve.
-
 ### XML Actuators
 
-Wrap actuators already defined in your robot's XML file. The config finds
-existing actuators by matching their `target` joint name against the
-`joint_names_expr` patterns. Each joint must have exactly one matching
+XML actuators wrap actuators already defined in your robot's XML file. The
+config finds existing actuators by matching their `target` joint name against
+the `joint_names_expr` patterns. Each joint must have exactly one matching
 actuator.
 
 **XmlPositionActuator**: Wraps existing `<position>` actuators
@@ -223,14 +195,12 @@ from mjlab.actuator import XmlPositionActuatorCfg
 
 # Robot XML already has:
 # <actuator>
-#   <position name="hip_actuator" joint="hip_joint" kp="100"/>
+#   <position name="hip_joint" joint="hip_joint" kp="100"/>
 # </actuator>
 
 # Wrap existing XML actuators by joint name.
 actuators = (
-  XmlPositionActuatorCfg(
-    joint_names_expr=["hip_joint", "knee_joint"],
-  ),
+  XmlPositionActuatorCfg(joint_names_expr=["hip_joint"]),
 )
 ```
 
@@ -263,9 +233,6 @@ actuators = (
 
 **Multi-target delays:**
 
-For actuators that use multiple command targets (like `IdealPdActuator`), you
-can delay all targets together:
-
 ```python
 DelayedActuatorCfg(
   joint_names_expr=[".*"],
@@ -285,33 +252,58 @@ Delays are quantized to physics timesteps. For example, with 500Hz physics
 
 ---
 
-## Built-in (Implicit) vs. Explicit PD Control
+## PD Control and Integrator Choice
+
+The distinction between **built-in** and **explicit** PD control only makes sense
+in the context of how MuJoCo integrates velocity-dependent forces. This section
+explains how each actuator style interacts with the integrator, and why
+**mjlab uses `<implicitfast>` by default**.
+
+### Built-in vs Explicit PD Control
 
 **BuiltinPositionActuator** uses MuJoCo's internal PD implementation:
 
 - Creates `<position>` actuators in the MjSpec
-- Physics engine computes the PD law and integrates the velocity-dependent
-  damping force (−Kd·v) implicitly
+- Physics engine computes the PD law and integrates velocity-dependent damping
+  forces implicitly
 
 **IdealPdActuator** implements PD control explicitly:
 
 - Creates `<motor>` actuators in the MjSpec
-- Computes torques explicitly: `τ = Kp·pos_error + Kd·vel_error` and writes
-  them to `data.ctrl`
+- Computes torques explicitly: `τ = Kp·pos_error + Kd·vel_error`
 - The integrator cannot account for the velocity derivatives of these forces
 
 They match closely in the linear, unconstrained regime and small time steps.
 However, built-in PD is more numerically robust and as such can be used with
 larger gains and larger timesteps.
 
+### Integrator Behavior in MuJoCo
+
+The choice of integrator in MuJoCo strongly affects stability for
+velocity-dependent forces:
+
+- **`euler`** is semi-implicit but treats joint damping implicitly. Other
+  forces, including explicit actuator damping, are integrated explicitly.
+- **`implicitfast`** treats *all known velocity-dependent forces implicitly*,
+  stabilizing systems with large damping or stiff actuation.
+
+### mjlab Recommendation
+
+mjlab actuators apply damping inside the actuator (not in joints). Because of
+this, **Euler** cannot integrate the damping implicitly, making it less stable.
+The **`implicitfast`** integrator, however, handles both proportional and
+damping terms of the actuator implicitly, improving stability without
+additional cost.
+
+> **mjlab defaults to `<implicitfast>`**, as it is MuJoCo's recommended
+> integrator and provides superior stability for actuator-side damping.
+
 ---
 
-## Configuration
+## Authoring Actuator Configs
 
-### Multiple Actuator Configs for Different Joint Groups
-
-Since actuator parameters are uniform within each config, use separate
-actuator configs for joints that need different parameters:
+Since actuator parameters are uniform within each config, use separate actuator
+configs for joints that need different parameters:
 
 ```python
 from mjlab.actuator import BuiltinPositionActuatorCfg
@@ -349,9 +341,104 @@ G1_ACTUATORS = (
 )
 ```
 
+This design choice reflects a deliberate simplification in mjlab: each
+`ActuatorCfg` represents a single actuator type (e.g., a specific motor/gearbox
+model) applied uniformly across all joints it drives. Hardware parameters such
+as `armature` (reflected rotor inertia) and `gear` describe properties of the
+actuator hardware, even though they are implemented in MuJoCo as joint or
+actuator fields. In other frameworks (like Isaac Lab), these fields may accept
+`float | dict[str, float]` to support per-joint variation. mjlab instead
+encourages one config per actuator type or per joint group, keeping the hardware
+model physically consistent and explicit. The main trade-off is verbosity in
+special cases, such as parallel linkages, where per-joint overrides could have
+been convenient, but the benefit is clearer semantics and simpler maintenance.
+
+### Computing Hardware Parameters from Motor Specs
+
+mjlab provides utilities in `mjlab.utils.actuator` to compute actuator
+parameters from physical motor specifications. This is particularly useful for
+computing reflected inertia (`armature`) and deriving appropriate control gains
+from hardware datasheets.
+
+**Example: Unitree G1 motor configuration**
+
+```python
+from mjlab.utils.actuator import (
+  reflected_inertia_from_two_stage_planetary,
+  ElectricActuator
+)
+
+# Motor specs from manufacturer datasheet.
+ROTOR_INERTIAS_7520_14 = (
+  0.489e-4,  # Motor rotor inertia (kg·m²)
+  0.098e-4,  # Planet carrier inertia
+  0.533e-4,  # Output stage inertia
+)
+GEARS_7520_14 = (
+  1,            # First stage (motor to planet)
+  4.5,          # Second stage (planet to carrier)
+  1 + (48/22),  # Third stage (carrier to output)
+)
+
+# Compute reflected inertia at joint output.
+# J_reflected = J_motor*(N₁*N₂)² + J_carrier*N₂² + J_output.
+ARMATURE_7520_14 = reflected_inertia_from_two_stage_planetary(
+    ROTOR_INERTIAS_7520_14, GEARS_7520_14
+)
+
+# Create motor spec container.
+ACTUATOR_7520_14 = ElectricActuator(
+  reflected_inertia=ARMATURE_7520_14,
+  velocity_limit=32.0,   # rad/s at joint
+  effort_limit=88.0,     # N·m continuous torque
+)
+
+# Derive PD gains from natural frequency and damping ratio.
+NATURAL_FREQ = 10 * 2*pi  # 10 Hz bandwidth.
+DAMPING_RATIO = 2.0       # Overdamped, see note below.
+STIFFNESS = ARMATURE_7520_14 * NATURAL_FREQ²
+DAMPING = 2 * DAMPING_RATIO * ARMATURE_7520_14 * NATURAL_FREQ
+
+# Use in actuator config.
+from mjlab.actuator import BuiltinPositionActuatorCfg
+
+actuator = BuiltinPositionActuatorCfg(
+    joint_names_expr=[".*_hip_pitch_joint"],
+    stiffness=STIFFNESS,
+    damping=DAMPING,
+    effort_limit=ACTUATOR_7520_14.effort_limit,
+    armature=ACTUATOR_7520_14.reflected_inertia,
+)
+```
+
+> **Note on damping ratio selection:** The example uses `DAMPING_RATIO = 2.0`
+> (overdamped) rather than the critically damped value of 1.0. This is because
+> the reflected inertia calculation only accounts for the motor's rotor inertia,
+> not the apparent inertia of the links being moved. In practice, the total
+> effective inertia at the joint is higher than just the reflected motor inertia,
+> so using an overdamped ratio provides better stability margins when the true
+> system inertia is underestimated.
+
+**Parallel linkage approximation:**
+
+For joints driven by parallel linkages (like the G1's ankles with dual motors),
+the effective armature in the nominal configuration can be approximated as the
+sum of the individual motor armatures:
+
+```python
+# Two 5020 motors driving ankle through parallel linkage.
+G1_ACTUATOR_ANKLE = BuiltinPositionActuatorCfg(
+    joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
+    stiffness=STIFFNESS_5020 * 2,
+    damping=DAMPING_5020 * 2,
+    effort_limit=ACTUATOR_5020.effort_limit * 2,
+    armature=ACTUATOR_5020.reflected_inertia * 2,
+)
+```
+
 ---
 
-## Usage
+## Using Actuators in Environments
 
 ### Action Terms
 
@@ -361,7 +448,6 @@ Actuators are typically controlled via action terms in the action manager:
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.manager_term_config import ActionTermCfg
 
-# In your environment config:
 ActionTermCfg(
   cls=JointPositionActionCfg,
   asset_name="robot",
@@ -388,13 +474,12 @@ from mjlab.envs.mdp import events
 from mjlab.managers.manager_term_config import EventTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 
-# In your environment config:
 EventTermCfg(
   func=events.randomize_pd_gains,
   mode="reset",
   params={
     "asset_cfg": SceneEntityCfg("robot", actuator_names=[".*"]),
-    "kp_range": (0.8, 1.2),  # Scale existing gains by 0.8x to 1.2x
+    "kp_range": (0.8, 1.2),
     "kd_range": (0.8, 1.2),
     "distribution": "uniform",
     "operation": "scale",  # or "abs" for absolute values
