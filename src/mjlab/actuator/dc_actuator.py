@@ -15,7 +15,6 @@ import torch
 
 from mjlab.actuator.actuator import ActuatorCmd
 from mjlab.actuator.pd_actuator import IdealPdActuator, IdealPdActuatorCfg
-from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -30,17 +29,12 @@ class DcMotorActuatorCfg(IdealPdActuatorCfg):
   This actuator implements a DC motor torque-speed curve for more realistic
   actuator behavior. The motor produces maximum torque (saturation_effort) at
   zero velocity and reduces linearly to zero torque at maximum velocity.
-
-  All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/regex patterns to values. When using a dict,
-  all patterns must match at least one joint, and each joint must match exactly
-  one pattern, or a ValueError will be raised.
   """
 
-  saturation_effort: float | dict[str, float]
+  saturation_effort: float
   """Peak motor torque at zero velocity (stall torque)."""
 
-  velocity_limit: float | dict[str, float]
+  velocity_limit: float
   """Maximum motor velocity (no-load speed)."""
 
   def build(
@@ -84,26 +78,20 @@ class DcMotorActuator(IdealPdActuator[DcMotorCfgT], Generic[DcMotorCfgT]):
   ) -> None:
     super().initialize(mj_model, model, data, device)
 
-    saturation_effort_list = resolve_param_to_list(
-      self.cfg.saturation_effort, self._joint_names
-    )
-    velocity_limit_list = resolve_param_to_list(
-      self.cfg.velocity_limit, self._joint_names
-    )
-
     num_envs = data.nworld
+    num_joints = len(self._joint_names)
 
-    self.saturation_effort = (
-      torch.tensor(saturation_effort_list, dtype=torch.float, device=device)
-      .unsqueeze(0)
-      .expand(num_envs, -1)
-      .clone()
+    self.saturation_effort = torch.full(
+      (num_envs, num_joints),
+      self.cfg.saturation_effort,
+      dtype=torch.float,
+      device=device,
     )
-    self.velocity_limit_motor = (
-      torch.tensor(velocity_limit_list, dtype=torch.float, device=device)
-      .unsqueeze(0)
-      .expand(num_envs, -1)
-      .clone()
+    self.velocity_limit_motor = torch.full(
+      (num_envs, num_joints),
+      self.cfg.velocity_limit,
+      dtype=torch.float,
+      device=device,
     )
 
     # Compute corner velocity where torque-speed curve intersects effort_limit.
@@ -111,9 +99,7 @@ class DcMotorActuator(IdealPdActuator[DcMotorCfgT], Generic[DcMotorCfgT]):
     self._vel_at_effort_lim = self.velocity_limit_motor * (
       1 + self.force_limit / self.saturation_effort
     )
-    self._joint_vel_clipped = torch.zeros(
-      num_envs, len(self._joint_names), device=device
-    )
+    self._joint_vel_clipped = torch.zeros(num_envs, num_joints, device=device)
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:
     assert self._joint_vel_clipped is not None

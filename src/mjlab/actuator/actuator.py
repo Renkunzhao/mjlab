@@ -22,10 +22,10 @@ class ActuatorCfg(ABC):
   Can be a list of joint names or list of regex expressions.
   """
 
-  armature: float | dict[str, float] = 0.0
+  armature: float = 0.0
   """Reflected rotor inertia."""
 
-  frictionloss: float | dict[str, float] = 0.0
+  frictionloss: float = 0.0
   """Friction loss force limit.
 
   Applies a constant friction force opposing motion, independent of load or velocity.

@@ -11,7 +11,6 @@ import torch
 
 from mjlab.actuator.actuator import Actuator, ActuatorCfg, ActuatorCmd
 from mjlab.utils.spec import create_motor_actuator
-from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -21,19 +20,13 @@ IdealPdCfgT = TypeVar("IdealPdCfgT", bound="IdealPdActuatorCfg")
 
 @dataclass(kw_only=True)
 class IdealPdActuatorCfg(ActuatorCfg):
-  """Configuration for ideal PD actuator.
+  """Configuration for ideal PD actuator."""
 
-  All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/regex patterns to values. When using a dict,
-  all patterns must match at least one joint, and each joint must match exactly
-  one pattern, or a ValueError will be raised.
-  """
-
-  stiffness: float | dict[str, float]
+  stiffness: float
   """PD stiffness (proportional gain)."""
-  damping: float | dict[str, float]
+  damping: float
   """PD damping (derivative gain)."""
-  effort_limit: float | dict[str, float] = float("inf")
+  effort_limit: float = float("inf")
   """Maximum force/torque limit."""
 
   def build(
@@ -59,19 +52,14 @@ class IdealPdActuator(Actuator, Generic[IdealPdCfgT]):
     self.force_limit: torch.Tensor | None = None
 
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
-    # Resolve parameters to per-joint lists.
-    armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
-    effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
-
     # Add <motor> actuator to spec, one per joint.
-    for i, joint_name in enumerate(joint_names):
+    for joint_name in joint_names:
       actuator = create_motor_actuator(
         spec,
         joint_name,
-        effort_limit=effort_limit[i],
-        armature=armature[i],
-        frictionloss=frictionloss[i],
+        effort_limit=self.cfg.effort_limit,
+        armature=self.cfg.armature,
+        frictionloss=self.cfg.frictionloss,
       )
       self._mjs_actuators.append(actuator)
 
@@ -84,28 +72,16 @@ class IdealPdActuator(Actuator, Generic[IdealPdCfgT]):
   ) -> None:
     super().initialize(mj_model, model, data, device)
 
-    stiffness_list = resolve_param_to_list(self.cfg.stiffness, self._joint_names)
-    damping_list = resolve_param_to_list(self.cfg.damping, self._joint_names)
-    force_limit_list = resolve_param_to_list(self.cfg.effort_limit, self._joint_names)
-
     num_envs = data.nworld
-    self.stiffness = (
-      torch.tensor(stiffness_list, dtype=torch.float, device=device)
-      .unsqueeze(0)
-      .expand(num_envs, -1)
-      .clone()
+    num_joints = len(self._joint_names)
+    self.stiffness = torch.full(
+      (num_envs, num_joints), self.cfg.stiffness, dtype=torch.float, device=device
     )
-    self.damping = (
-      torch.tensor(damping_list, dtype=torch.float, device=device)
-      .unsqueeze(0)
-      .expand(num_envs, -1)
-      .clone()
+    self.damping = torch.full(
+      (num_envs, num_joints), self.cfg.damping, dtype=torch.float, device=device
     )
-    self.force_limit = (
-      torch.tensor(force_limit_list, dtype=torch.float, device=device)
-      .unsqueeze(0)
-      .expand(num_envs, -1)
-      .clone()
+    self.force_limit = torch.full(
+      (num_envs, num_joints), self.cfg.effort_limit, dtype=torch.float, device=device
     )
 
   def compute(self, cmd: ActuatorCmd) -> torch.Tensor:

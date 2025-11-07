@@ -18,7 +18,6 @@ from mjlab.utils.spec import (
   create_position_actuator,
   create_velocity_actuator,
 )
-from mjlab.utils.string import resolve_param_to_list
 
 if TYPE_CHECKING:
   from mjlab.entity import Entity
@@ -28,21 +27,16 @@ if TYPE_CHECKING:
 class BuiltinPdActuatorCfg(ActuatorCfg):
   """Configuration for MuJoCo built-in PD actuator.
 
-  All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/regex patterns to values. When using a dict,
-  all patterns must match at least one joint, and each joint must match exactly
-  one pattern, or a ValueError will be raised.
-
   Under the hood, this creates a <position> actuator for each joint and sets
   the stiffness, damping and effort limits accordingly. It also modifies the
   actuated joint's properties, namely armature and frictionloss.
   """
 
-  stiffness: float | dict[str, float]
+  stiffness: float
   """PD proportional gain."""
-  damping: float | dict[str, float]
+  damping: float
   """PD derivative gain."""
-  effort_limit: float | dict[str, float] | None = None
+  effort_limit: float | None = None
   """Maximum actuator force/torque. If None, no limit is applied."""
 
   def build(
@@ -65,26 +59,16 @@ class BuiltinPdActuator(Actuator):
     self.cfg = cfg
 
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
-    # Resolve parameters to per-joint lists.
-    stiffness = resolve_param_to_list(self.cfg.stiffness, joint_names)
-    damping = resolve_param_to_list(self.cfg.damping, joint_names)
-    armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
-    if self.cfg.effort_limit is not None:
-      effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
-    else:
-      effort_limit = [None] * len(joint_names)
-
     # Add <position> actuator to spec, one per joint.
-    for i, joint_name in enumerate(joint_names):
+    for joint_name in joint_names:
       actuator = create_position_actuator(
         spec,
         joint_name,
-        stiffness=stiffness[i],
-        damping=damping[i],
-        effort_limit=effort_limit[i],
-        armature=armature[i],
-        frictionloss=frictionloss[i],
+        stiffness=self.cfg.stiffness,
+        damping=self.cfg.damping,
+        effort_limit=self.cfg.effort_limit,
+        armature=self.cfg.armature,
+        frictionloss=self.cfg.frictionloss,
       )
       self._mjs_actuators.append(actuator)
 
@@ -96,19 +80,14 @@ class BuiltinPdActuator(Actuator):
 class BuiltinTorqueActuatorCfg(ActuatorCfg):
   """Configuration for MuJoCo built-in torque actuator.
 
-  All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/regex patterns to values. When using a dict,
-  all patterns must match at least one joint, and each joint must match exactly
-  one pattern, or a ValueError will be raised.
-
   Under the hood, this creates a <motor> actuator for each joint and sets
   its effort limit and gear ratio accordingly. It also modifies the actuated
   joint's properties, namely armature and frictionloss.
   """
 
-  effort_limit: float | dict[str, float]
+  effort_limit: float
   """Maximum actuator effort."""
-  gear: float | dict[str, float] = 1.0
+  gear: float = 1.0
   """Actuator gear ratio."""
 
   def build(
@@ -131,21 +110,15 @@ class BuiltinTorqueActuator(Actuator):
     self.cfg = cfg
 
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
-    # Resolve parameters to per-joint lists.
-    effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
-    armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
-    gear = resolve_param_to_list(self.cfg.gear, joint_names)
-
     # Add <motor> actuator to spec, one per joint.
-    for i, joint_name in enumerate(joint_names):
+    for joint_name in joint_names:
       actuator = create_motor_actuator(
         spec,
         joint_name,
-        effort_limit=effort_limit[i],
-        gear=gear[i],
-        armature=armature[i],
-        frictionloss=frictionloss[i],
+        effort_limit=self.cfg.effort_limit,
+        gear=self.cfg.gear,
+        armature=self.cfg.armature,
+        frictionloss=self.cfg.frictionloss,
       )
       self._mjs_actuators.append(actuator)
 
@@ -157,19 +130,14 @@ class BuiltinTorqueActuator(Actuator):
 class BuiltinVelocityActuatorCfg(ActuatorCfg):
   """Configuration for MuJoCo built-in velocity actuator.
 
-  All parameters can be specified as a single float (broadcast to all joints)
-  or a dict mapping joint names/regex patterns to values. When using a dict,
-  all patterns must match at least one joint, and each joint must match exactly
-  one pattern, or a ValueError will be raised.
-
   Under the hood, this creates a <velocity> actuator for each joint and sets
   the damping gain. It also modifies the actuated joint's properties, namely
   armature and frictionloss.
   """
 
-  damping: float | dict[str, float]
+  damping: float
   """Damping gain."""
-  effort_limit: float | dict[str, float] | None = None
+  effort_limit: float | None = None
   """Maximum actuator force/torque. If None, no limit is applied."""
 
   def build(
@@ -192,24 +160,15 @@ class BuiltinVelocityActuator(Actuator):
     self.cfg = cfg
 
   def edit_spec(self, spec: mujoco.MjSpec, joint_names: list[str]) -> None:
-    # Resolve parameters to per-joint lists.
-    damping = resolve_param_to_list(self.cfg.damping, joint_names)
-    armature = resolve_param_to_list(self.cfg.armature, joint_names)
-    frictionloss = resolve_param_to_list(self.cfg.frictionloss, joint_names)
-    if self.cfg.effort_limit is not None:
-      effort_limit = resolve_param_to_list(self.cfg.effort_limit, joint_names)
-    else:
-      effort_limit = [None] * len(joint_names)
-
     # Add <velocity> actuator to spec, one per joint.
-    for i, joint_name in enumerate(joint_names):
+    for joint_name in joint_names:
       actuator = create_velocity_actuator(
         spec,
         joint_name,
-        damping=damping[i],
-        effort_limit=effort_limit[i],
-        armature=armature[i],
-        frictionloss=frictionloss[i],
+        damping=self.cfg.damping,
+        effort_limit=self.cfg.effort_limit,
+        armature=self.cfg.armature,
+        frictionloss=self.cfg.frictionloss,
       )
       self._mjs_actuators.append(actuator)
 
