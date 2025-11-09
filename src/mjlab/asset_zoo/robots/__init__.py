@@ -4,8 +4,12 @@ from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
 from mjlab.asset_zoo.robots.unitree_go1.go1_constants import (
   get_go1_robot_cfg as get_go1_robot_cfg,
 )
+from mjlab.asset_zoo.robots.unitree_go2.go2_constants import (
+  get_go2_robot_cfg as get_go2_robot_cfg,
+)
 
 __all__ = (
   "get_g1_robot_cfg",
   "get_go1_robot_cfg",
+  "get_go2_robot_cfg",
 )
