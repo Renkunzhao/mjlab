@@ -28,7 +28,7 @@
             "args": [
                 "run",
                 "play",
-                "Mjlab-Velocity-Flat-Unitree-G1-Play",
+                "Mjlab-Velocity-Flat-Unitree-G1",
                 "--num_envs", "32",
                 // "--viewer","viser",
                 "--wandb-run-path",
@@ -59,7 +59,7 @@
             "args": [
                 "run",
                 "play",
-                "Mjlab-Velocity-Rough-Unitree-Go1-Play",
+                "Mjlab-Velocity-Rough-Unitree-Go1",
                 "--num_envs", "32",
                 "--wandb-run-path",
                 "kzren-university-of-wisconsin-madison/mjlab/8b5lgt1u",
@@ -89,10 +89,10 @@
             "args": [
                 "run",
                 "play",
-                "Mjlab-Velocity-Rough-Unitree-Go2-Play",
+                "Mjlab-Velocity-Rough-Unitree-Go2",
                 // "--agent", "random",
                 "--num_envs", "32",
-                "--viewer","viser",
+                // "--viewer","viser",
                 "--wandb-run-path",
                 "kzren-university-of-wisconsin-madison/mjlab/v4j4layr",
                 // "--checkpoint_file",
