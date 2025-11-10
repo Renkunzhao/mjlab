@@ -5,7 +5,7 @@ videos/
 __pycache__/
 MUJOCO_LOG.TXT
 debug.py
-.vscode/
+# .vscode/
 *.ipynb_checkpoints/
 *.ipynb
 motions/

@@ -1,0 +1,108 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "List env",
+            "type": "shell",
+            "command": "uv run list_envs",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Train G1",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Flat-Unitree-G1 --env.scene.num-envs 4096",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Play G1",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "Mjlab-Velocity-Flat-Unitree-G1-Play",
+                "--num_envs", "32",
+                // "--viewer","viser",
+                "--wandb-run-path",
+                "kzren-university-of-wisconsin-madison/mjlab/gwb1irkk",
+                "--checkpoint_file",
+                "logs/rsl_rl/g1_velocity/2025-11-07_18-52-00/model_2000.pt"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Train Go1",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Rough-Unitree-Go1 --env.scene.num-envs 4096",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Play Go1",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "Mjlab-Velocity-Rough-Unitree-Go1-Play",
+                "--num_envs", "32",
+                "--wandb-run-path",
+                "kzren-university-of-wisconsin-madison/mjlab/8b5lgt1u",
+                // "--checkpoint_file",
+                // "logs/rsl_rl/go1_velocity/2025-11-08_04-49-24/model_9999.pt"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Train Go2",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Flat-Unitree-Go2 --env.scene.num-envs 4096",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Play Go2",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "Mjlab-Velocity-Rough-Unitree-Go2-Play",
+                // "--agent", "random",
+                "--num_envs", "32",
+                "--viewer","viser",
+                "--wandb-run-path",
+                "kzren-university-of-wisconsin-madison/mjlab/v4j4layr",
+                // "--checkpoint_file",
+                // "logs/rsl_rl/go2_velocity/2025-11-08_04-49-24/model_9999.pt"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+    ]
+}

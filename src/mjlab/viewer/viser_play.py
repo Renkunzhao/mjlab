@@ -35,7 +35,7 @@ class ViserPlayViewer(BaseViewer):
     sim = self.env.unwrapped.sim
     assert isinstance(sim, Simulation)
 
-    self._server = viser.ViserServer(label="mjlab")
+    self._server = viser.ViserServer(host="0.0.0.0", port=8080, label="mjlab")
     self._threadpool = ThreadPoolExecutor(max_workers=1)
     self._counter = 0
     self._needs_update = False
