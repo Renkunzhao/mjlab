@@ -104,5 +104,37 @@
             "group": "scripts",
             "problemMatcher": []
         },
+        {
+            "label": "Hopping Go2 Train",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train Mjlab-Hopping-Flat-Unitree-Go2 --env.scene.num-envs 4096",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Hopping Go2 play",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "Mjlab-Hopping-Flat-Unitree-Go2",
+                // "--agent", "random",
+                "--num_envs", "32",
+                // "--viewer","viser",
+                "--wandb-run-path",
+                "kzren-university-of-wisconsin-madison/mjlab/z033t6n1",
+                // "--checkpoint_file",
+                // "logs/rsl_rl/go2_velocity/2025-11-08_04-49-24/model_9999.pt"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
     ]
 }
