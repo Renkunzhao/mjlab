@@ -24,8 +24,9 @@ from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.scene import SceneCfg
 from mjlab.sensor import ContactSensorCfg
 from mjlab.sim import MujocoCfg, SimulationCfg
-from mjlab.tasks.velocity import mdp
-from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from mjlab.tasks.hopping import mdp
+from mjlab.tasks.hopping.mdp import HoppingCommandCfg
+from mjlab.tasks.hopping.mdp import UniformVelocityCommandCfg
 from mjlab.terrains import TerrainImporterCfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
@@ -107,29 +108,32 @@ def create_hopping_env_cfg(
 
   #TODO: 
   commands: dict[str, CommandTermCfg] = {
+    "hop": HoppingCommandCfg(
+      asset_name="robot",
+      resampling_time_range=(1.0, 1.0),
+      debug_vis=True,
+      ranges=HoppingCommandCfg.Ranges(
+        height=(0.15, 0.4),
+      ),
+    ),
     "twist": UniformVelocityCommandCfg(
       asset_name="robot",
       resampling_time_range=(3.0, 8.0),
-      rel_standing_envs=0.1,
-      rel_heading_envs=0.3,
+      rel_standing_envs=1,
+      rel_heading_envs=0,
       heading_command=True,
       heading_control_stiffness=0.5,
-      debug_vis=True,
+      # debug_vis=True,
       ranges=UniformVelocityCommandCfg.Ranges(
         lin_vel_x=(-1.0, 1.0),
         lin_vel_y=(-1.0, 1.0),
         ang_vel_z=(-0.5, 0.5),
         heading=(-math.pi, math.pi),
       ),
-    )
+    ),
   }
 
   policy_terms = {
-    "base_lin_vel": ObservationTermCfg(
-      func=mdp.builtin_sensor,
-      params={"sensor_name": "robot/imu_lin_vel"},
-      noise=Unoise(n_min=-0.5, n_max=0.5),
-    ),
     "base_ang_vel": ObservationTermCfg(
       func=mdp.builtin_sensor,
       params={"sensor_name": "robot/imu_ang_vel"},
@@ -152,10 +156,19 @@ def create_hopping_env_cfg(
       func=mdp.generated_commands,
       params={"command_name": "twist"},
     ),
+    "hop_command": ObservationTermCfg(
+        func=mdp.generated_commands,
+        params={"command_name": "hop"},
+    ), 
   }
 
   critic_terms = {
     **policy_terms,
+    "base_lin_vel": ObservationTermCfg(
+      func=mdp.builtin_sensor,
+      params={"sensor_name": "robot/imu_lin_vel"},
+      noise=Unoise(n_min=-0.5, n_max=0.5),
+    ),
     "foot_height": ObservationTermCfg(
       func=mdp.foot_height,
       params={"asset_cfg": SceneEntityCfg("robot", site_names=site_names)},
@@ -225,14 +238,19 @@ def create_hopping_env_cfg(
   }
 
   rewards = {
+    "track_height": RewardTermCfg(
+      func=mdp.track_height,
+      weight=1.0,
+      params={"command_name": "hop", "std": math.sqrt(0.02)},
+    ),
     "track_linear_velocity": RewardTermCfg(
       func=mdp.track_linear_velocity,
-      weight=2.0,
+      weight=0.0,
       params={"command_name": "twist", "std": math.sqrt(0.25)},
     ),
     "track_angular_velocity": RewardTermCfg(
       func=mdp.track_angular_velocity,
-      weight=2.0,
+      weight=0,
       params={"command_name": "twist", "std": math.sqrt(0.5)},
     ),
     "upright": RewardTermCfg(
@@ -245,7 +263,7 @@ def create_hopping_env_cfg(
     ),
     "pose": RewardTermCfg(
       func=mdp.variable_posture,
-      weight=1.0,
+      weight=0.0,
       params={
         "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
         "command_name": "twist",
@@ -286,7 +304,7 @@ def create_hopping_env_cfg(
     ),
     "foot_clearance": RewardTermCfg(
       func=mdp.feet_clearance,
-      weight=-2.0,
+      weight=0,
       params={
         "target_height": 0.1,
         "command_name": "twist",
@@ -296,7 +314,7 @@ def create_hopping_env_cfg(
     ),
     "foot_swing_height": RewardTermCfg(
       func=mdp.feet_swing_height,
-      weight=-0.25,
+      weight=0,
       params={
         "sensor_name": "feet_ground_contact",
         "target_height": 0.1,
@@ -307,7 +325,7 @@ def create_hopping_env_cfg(
     ),
     "foot_slip": RewardTermCfg(
       func=mdp.feet_slip,
-      weight=-0.1,
+      weight=0,
       params={
         "sensor_name": "feet_ground_contact",
         "command_name": "twist",
@@ -317,7 +335,7 @@ def create_hopping_env_cfg(
     ),
     "soft_landing": RewardTermCfg(
       func=mdp.soft_landing,
-      weight=-1e-5,
+      weight=0,
       params={
         "sensor_name": "feet_ground_contact",
         "command_name": "twist",
