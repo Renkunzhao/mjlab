@@ -19,6 +19,22 @@ if TYPE_CHECKING:
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 
+def track_height(
+  env: ManagerBasedRlEnv,
+  std: float,
+  command_name: str,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Reward for tracking the commanded base linear velocity.
+
+  The commanded z velocity is assumed to be zero.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+  command = env.command_manager.get_command(command_name)
+  assert command is not None, f"Command '{command_name}' not found."
+  actual = asset.data.root_link_pos_w[:, 2]
+  z_error = torch.square(command.squeeze(-1) - actual)
+  return torch.exp(-z_error / std**2)
 
 def track_linear_velocity(
   env: ManagerBasedRlEnv,

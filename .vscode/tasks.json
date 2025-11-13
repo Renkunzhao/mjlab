@@ -75,7 +75,7 @@
         {
             "label": "Train Go2",
             "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Flat-Unitree-Go2 --env.scene.num-envs 4096",
+            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Rough-Unitree-Go2 --env.scene.num-envs 4096",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -126,9 +126,11 @@
                 "--num_envs", "32",
                 // "--viewer","viser",
                 "--wandb-run-path",
-                "kzren-university-of-wisconsin-madison/mjlab/z033t6n1",
+                // "kzren-university-of-wisconsin-madison/mjlab/z033t6n1",  // Hopping Init, flat walking
+                // "kzren-university-of-wisconsin-madison/mjlab/rl50w0vp",     // Height
+                "kzren-university-of-wisconsin-madison/mjlab/wlvdfr3x"        // Height
                 // "--checkpoint_file",
-                // "logs/rsl_rl/go2_velocity/2025-11-08_04-49-24/model_9999.pt"
+                // "logs/rsl_rl/go2_hopping/2025-11-12_23-48-32/model_0.pt"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
