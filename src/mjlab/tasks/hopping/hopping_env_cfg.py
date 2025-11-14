@@ -205,7 +205,7 @@ def create_hopping_env_cfg(
       func=mdp.reset_root_state_uniform,
       mode="reset",
       params={
-        "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+        "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "z": (0.5, 1), "yaw": (-3.14, 3.14)},
         "velocity_range": {},
       },
     ),

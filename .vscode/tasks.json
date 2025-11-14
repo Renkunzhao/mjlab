@@ -33,8 +33,8 @@
                 // "--viewer","viser",
                 "--wandb-run-path",
                 "kzren-university-of-wisconsin-madison/mjlab/gwb1irkk",
-                "--checkpoint_file",
-                "logs/rsl_rl/g1_velocity/2025-11-07_18-52-00/model_2000.pt"
+                // "--checkpoint_file",
+                // "logs/rsl_rl/g1_velocity/2025-11-07_18-52-00/model_2000.pt"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -94,7 +94,8 @@
                 "--num_envs", "32",
                 // "--viewer","viser",
                 "--wandb-run-path",
-                "kzren-university-of-wisconsin-madison/mjlab/v4j4layr",
+                // "kzren-university-of-wisconsin-madison/mjlab/v4j4layr",
+                "kzren-university-of-wisconsin-madison/mjlab/5jc954s2", // Velocity, rough
                 // "--checkpoint_file",
                 // "logs/rsl_rl/go2_velocity/2025-11-08_04-49-24/model_9999.pt"
             ],
@@ -107,7 +108,14 @@
         {
             "label": "Hopping Go2 Train",
             "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train Mjlab-Hopping-Flat-Unitree-Go2 --env.scene.num-envs 4096",
+            "command": "uv",
+            "args": [
+                "run",
+                "train",
+                "Mjlab-Hopping-Flat-Unitree-Go2",
+                "--env.scene.num-envs", "4096",
+                "--video", "True"
+            ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -127,8 +135,7 @@
                 // "--viewer","viser",
                 "--wandb-run-path",
                 // "kzren-university-of-wisconsin-madison/mjlab/z033t6n1",  // Hopping Init, flat walking
-                // "kzren-university-of-wisconsin-madison/mjlab/rl50w0vp",     // Height
-                "kzren-university-of-wisconsin-madison/mjlab/wlvdfr3x"        // Height
+                "kzren-university-of-wisconsin-madison/mjlab/ldoo5kn2"      // Height track, Initial land
                 // "--checkpoint_file",
                 // "logs/rsl_rl/go2_hopping/2025-11-12_23-48-32/model_0.pt"
             ],
