@@ -1,5 +1,33 @@
 {
     "version": "2.0.0",
+    "inputs": [
+        {
+        "id": "task",
+        "type": "pickString",
+        "description": "Select task",
+        "options": [
+            "Mjlab-Hopping-Flat-Unitree-Go2", 
+            "Mjlab-Tracking-Flat-Unitree-G1",
+            "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
+            "Mjlab-Velocity-Rough-Unitree-G1",
+            "Mjlab-Velocity-Flat-Unitree-G1",
+            "Mjlab-Velocity-Rough-Unitree-Go1",
+            "Mjlab-Velocity-Flat-Unitree-Go1",
+            "Mjlab-Velocity-Rough-Unitree-Go2",
+            "Mjlab-Velocity-Flat-Unitree-Go2"
+        ],
+        "default": "Mjlab-Hopping-Flat-Unitree-Go2"
+        },
+        {
+        "id": "motion",
+        "type": "pickString",
+        "description": "Select task",
+        "options": [
+            "LAFAN1-g1-jumps1_subject1", 
+        ],
+        "default": "LAFAN1-g1-jumps1_subject1"
+        },
+    ],  
     "tasks": [
         {
             "label": "List env",
@@ -12,9 +40,9 @@
             "problemMatcher": []
         },
         {
-            "label": "Train G1",
+            "label": "Train",
             "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Flat-Unitree-G1 --env.scene.num-envs 4096",
+            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name kzren-uw-madison/wandb-registry-Motions/${input:motion} --env.scene.num-envs 4096",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -43,16 +71,6 @@
             "problemMatcher": []
         },
         {
-            "label": "Train Go1",
-            "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Rough-Unitree-Go1 --env.scene.num-envs 4096",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "group": "scripts",
-            "problemMatcher": []
-        },
-        {
             "label": "Play Go1",
             "type": "shell",
             "command": "uv",
@@ -66,16 +84,6 @@
                 // "--checkpoint_file",
                 // "logs/rsl_rl/go1_velocity/2025-11-08_04-49-24/model_9999.pt"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "group": "scripts",
-            "problemMatcher": []
-        },
-        {
-            "label": "Train Go2",
-            "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train Mjlab-Velocity-Rough-Unitree-Go2 --env.scene.num-envs 4096",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
