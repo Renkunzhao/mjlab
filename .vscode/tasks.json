@@ -2,30 +2,30 @@
     "version": "2.0.0",
     "inputs": [
         {
-        "id": "task",
-        "type": "pickString",
-        "description": "Select task",
-        "options": [
-            "Mjlab-Hopping-Flat-Unitree-Go2", 
-            "Mjlab-Tracking-Flat-Unitree-G1",
-            "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
-            "Mjlab-Velocity-Rough-Unitree-G1",
-            "Mjlab-Velocity-Flat-Unitree-G1",
-            "Mjlab-Velocity-Rough-Unitree-Go1",
-            "Mjlab-Velocity-Flat-Unitree-Go1",
-            "Mjlab-Velocity-Rough-Unitree-Go2",
-            "Mjlab-Velocity-Flat-Unitree-Go2"
-        ],
-        "default": "Mjlab-Hopping-Flat-Unitree-Go2"
+            "id": "task",
+            "type": "pickString",
+            "description": "Select task",
+            "options": [
+                "Mjlab-Hopping-Flat-Unitree-Go2", 
+                "Mjlab-Tracking-Flat-Unitree-G1",
+                "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
+                "Mjlab-Velocity-Rough-Unitree-G1",
+                "Mjlab-Velocity-Flat-Unitree-G1",
+                "Mjlab-Velocity-Rough-Unitree-Go1",
+                "Mjlab-Velocity-Flat-Unitree-Go1",
+                "Mjlab-Velocity-Rough-Unitree-Go2",
+                "Mjlab-Velocity-Flat-Unitree-Go2"
+            ],
+            "default": "Mjlab-Hopping-Flat-Unitree-Go2"
         },
         {
-        "id": "motion",
-        "type": "pickString",
-        "description": "Select task",
-        "options": [
-            "LAFAN1-g1-jumps1_subject1", 
-        ],
-        "default": "LAFAN1-g1-jumps1_subject1"
+            "id": "motion",
+            "type": "pickString",
+            "description": "Select task",
+            "options": [
+                "LAFAN1-g1-jumps1_subject1", 
+            ],
+            "default": "LAFAN1-g1-jumps1_subject1"
         },
     ],  
     "tasks": [
@@ -42,7 +42,26 @@
         {
             "label": "Train",
             "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name kzren-uw-madison/wandb-registry-Motions/${input:motion} --env.scene.num-envs 4096",
+            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name kzren-uw-madison/wandb-registry-Motions/${input:motion} --env.scene.num-envs 4096 --video True",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "scripts",
+            "problemMatcher": []
+        },
+        {
+            "label": "Play G1 track",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "Mjlab-Tracking-Flat-Unitree-G1",
+                "--num_envs", "32",
+                // "--viewer","viser",
+                "--wandb-run-path",
+                "kzren-university-of-wisconsin-madison/mjlab/tliacg6f",
+            ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -114,23 +133,6 @@
             "problemMatcher": []
         },
         {
-            "label": "Hopping Go2 Train",
-            "type": "shell",
-            "command": "uv",
-            "args": [
-                "run",
-                "train",
-                "Mjlab-Hopping-Flat-Unitree-Go2",
-                "--env.scene.num-envs", "4096",
-                "--video", "True"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "group": "scripts",
-            "problemMatcher": []
-        },
-        {
             "label": "Hopping Go2 play",
             "type": "shell",
             "command": "uv",
@@ -143,7 +145,10 @@
                 // "--viewer","viser",
                 "--wandb-run-path",
                 // "kzren-university-of-wisconsin-madison/mjlab/z033t6n1",  // Hopping Init, flat walking
-                "kzren-university-of-wisconsin-madison/mjlab/ldoo5kn2"      // Height track, Initial land
+                // "kzren-university-of-wisconsin-madison/mjlab/ldoo5kn2"      // Height track, Initial land
+                // "kzren-university-of-wisconsin-madison/mjlab/t2xrq3h3"
+                // "kzren-university-of-wisconsin-madison/mjlab/ijrlv2vn"
+                "kzren-university-of-wisconsin-madison/mjlab/l1u7221x"
                 // "--checkpoint_file",
                 // "logs/rsl_rl/go2_hopping/2025-11-12_23-48-32/model_0.pt"
             ],
