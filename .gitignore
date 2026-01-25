@@ -7,10 +7,14 @@ MUJOCO_LOG.TXT
 debug.py
 # .vscode/
 *.ipynb_checkpoints/
-*.ipynb
 motions/
 *_rerun*
-*.mp4
 artifacts/
 .venv/
 render_robots.py
+benchmark_results/
+
+# Documentation outputs.
+**/_build/*
+**/generated/*
+

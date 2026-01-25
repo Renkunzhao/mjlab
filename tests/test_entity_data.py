@@ -77,7 +77,7 @@ def test_root_velocity_frame_conversion(device):
   stores it in body frame. This test verifies the conversion happens
   correctly by checking qvel directly.
   """
-  from mjlab.third_party.isaaclab.isaaclab.utils.math import (
+  from mjlab.utils.lab_api.math import (
     quat_apply_inverse,
   )
 
@@ -156,3 +156,129 @@ def test_read_requires_forward_to_be_current(device):
   current_pose = entity.data.root_link_pose_w
   assert torch.allclose(current_pose, new_pose, atol=1e-4)
   assert not torch.allclose(current_pose, initial_pose, atol=1e-4)
+
+
+@pytest.mark.parametrize(
+  "property_name,expected_shape",
+  [
+    # Root properties.
+    ("root_link_pose_w", (1, 7)),
+    ("root_link_pos_w", (1, 3)),
+    ("root_link_quat_w", (1, 4)),
+    ("root_link_vel_w", (1, 6)),
+    ("root_link_lin_vel_w", (1, 3)),
+    ("root_link_ang_vel_w", (1, 3)),
+    ("root_com_pose_w", (1, 7)),
+    ("root_com_pos_w", (1, 3)),
+    ("root_com_quat_w", (1, 4)),
+    ("root_com_vel_w", (1, 6)),
+    ("root_com_lin_vel_w", (1, 3)),
+    ("root_com_ang_vel_w", (1, 3)),
+    # Body properties (we only have 1 body in this test).
+    ("body_link_pose_w", (1, 1, 7)),
+    ("body_link_pos_w", (1, 1, 3)),
+    ("body_link_quat_w", (1, 1, 4)),
+    ("body_link_vel_w", (1, 1, 6)),
+    ("body_com_pose_w", (1, 1, 7)),
+    ("body_com_vel_w", (1, 1, 6)),
+  ],
+)
+def test_entity_data_properties_accessible(device, property_name, expected_shape):
+  """Test that all EntityData properties can be accessed without errors."""
+  entity = create_floating_base_entity()
+  entity, sim = initialize_entity_with_sim(entity, device)
+
+  sim.forward()
+
+  value = getattr(entity.data, property_name)
+  assert value.shape == expected_shape, f"{property_name} has unexpected shape"
+
+
+def test_entity_data_reset_clears_all_targets(device):
+  """Test that EntityData.clear_state() zeros out all target buffers."""
+  from pathlib import Path
+
+  from mjlab.actuator.actuator import TransmissionType
+  from mjlab.actuator.builtin_actuator import BuiltinMotorActuatorCfg
+  from mjlab.entity import EntityArticulationInfoCfg
+
+  xml_path = Path(__file__).parent / "fixtures" / "tendon_finger.xml"
+
+  cfg = EntityCfg(
+    spec_fn=lambda: mujoco.MjSpec.from_file(str(xml_path)),
+    articulation=EntityArticulationInfoCfg(
+      actuators=(
+        BuiltinMotorActuatorCfg(
+          target_names_expr=("finger_tendon",),
+          transmission_type=TransmissionType.TENDON,
+          effort_limit=10.0,
+        ),
+      )
+    ),
+  )
+  entity = Entity(cfg)
+  entity, sim = initialize_entity_with_sim(entity, device, num_envs=4)
+
+  entity.data.joint_pos_target[:] = 1.0
+  entity.data.joint_vel_target[:] = 2.0
+  entity.data.joint_effort_target[:] = 3.0
+  entity.data.tendon_len_target[:] = 4.0
+  entity.data.tendon_vel_target[:] = 5.0
+  entity.data.tendon_effort_target[:] = 6.0
+
+  entity.data.clear_state()
+
+  assert torch.all(entity.data.joint_pos_target == 0.0)
+  assert torch.all(entity.data.joint_vel_target == 0.0)
+  assert torch.all(entity.data.joint_effort_target == 0.0)
+  assert torch.all(entity.data.tendon_len_target == 0.0)
+  assert torch.all(entity.data.tendon_vel_target == 0.0)
+  assert torch.all(entity.data.tendon_effort_target == 0.0)
+
+
+def test_entity_data_reset_partial_envs(device):
+  """Test that EntityData.clear_state() can reset specific environments."""
+  from pathlib import Path
+
+  from mjlab.actuator.actuator import TransmissionType
+  from mjlab.actuator.builtin_actuator import BuiltinMotorActuatorCfg
+  from mjlab.entity import EntityArticulationInfoCfg
+
+  xml_path = Path(__file__).parent / "fixtures" / "tendon_finger.xml"
+
+  cfg = EntityCfg(
+    spec_fn=lambda: mujoco.MjSpec.from_file(str(xml_path)),
+    articulation=EntityArticulationInfoCfg(
+      actuators=(
+        BuiltinMotorActuatorCfg(
+          target_names_expr=("finger_tendon",),
+          transmission_type=TransmissionType.TENDON,
+          effort_limit=10.0,
+        ),
+      )
+    ),
+  )
+  entity = Entity(cfg)
+  entity, sim = initialize_entity_with_sim(entity, device, num_envs=4)
+
+  entity.data.tendon_len_target[:] = 7.0
+  entity.data.tendon_vel_target[:] = 8.0
+  entity.data.tendon_effort_target[:] = 9.0
+
+  env_ids = torch.tensor([1, 3], device=device)
+  entity.data.clear_state(env_ids)
+
+  assert torch.all(entity.data.tendon_len_target[0] == 7.0)
+  assert torch.all(entity.data.tendon_len_target[1] == 0.0)
+  assert torch.all(entity.data.tendon_len_target[2] == 7.0)
+  assert torch.all(entity.data.tendon_len_target[3] == 0.0)
+
+  assert torch.all(entity.data.tendon_vel_target[0] == 8.0)
+  assert torch.all(entity.data.tendon_vel_target[1] == 0.0)
+  assert torch.all(entity.data.tendon_vel_target[2] == 8.0)
+  assert torch.all(entity.data.tendon_vel_target[3] == 0.0)
+
+  assert torch.all(entity.data.tendon_effort_target[0] == 9.0)
+  assert torch.all(entity.data.tendon_effort_target[1] == 0.0)
+  assert torch.all(entity.data.tendon_effort_target[2] == 9.0)
+  assert torch.all(entity.data.tendon_effort_target[3] == 0.0)

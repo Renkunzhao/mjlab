@@ -8,8 +8,8 @@ from tqdm import tqdm
 from mjlab.entity import Entity
 from mjlab.scene import Scene
 from mjlab.sim.sim import Simulation, SimulationCfg
-from mjlab.tasks.tracking.config.g1.env_cfgs import G1_FLAT_TRACKING_ENV_CFG
-from mjlab.third_party.isaaclab.isaaclab.utils.math import (
+from mjlab.tasks.tracking.config.g1.env_cfgs import unitree_g1_flat_tracking_env_cfg
+from mjlab.utils.lab_api.math import (
   axis_angle_from_quat,
   quat_conjugate,
   quat_mul,
@@ -356,10 +356,14 @@ def main(
     render: Whether to render the simulation and save a video.
     line_range: Range of lines to process from the CSV file.
   """
+  if device.startswith("cuda") and not torch.cuda.is_available():
+    print("[WARNING]: CUDA is not available. Falling back to CPU. This may be slow.")
+    device = "cpu"
+
   sim_cfg = SimulationCfg()
   sim_cfg.mujoco.timestep = 1.0 / output_fps
 
-  scene = Scene(G1_FLAT_TRACKING_ENV_CFG.scene, device=device)
+  scene = Scene(unitree_g1_flat_tracking_env_cfg().scene, device=device)
   model = scene.compile()
 
   sim = Simulation(num_envs=1, cfg=sim_cfg, model=model, device=device)

@@ -35,7 +35,7 @@ def test_actuator_parameters(go1_model, actuator_config, stiffness, damping):
     actuator = go1_model.actuator(i)
     actuator_name = actuator.name
     matches = any(
-      re.match(pattern, actuator_name) for pattern in actuator_config.joint_names_expr
+      re.match(pattern, actuator_name) for pattern in actuator_config.target_names_expr
     )
     if matches:
       assert actuator.gainprm[0] == stiffness
@@ -49,7 +49,8 @@ def test_keyframe_joint_positions(go1_entity, go1_model) -> None:
   """Test that keyframe joint positions match the configuration."""
   key = go1_model.key("init_state")
   expected_joint_pos = go1_constants.INIT_STATE.joint_pos
-  expected_values = resolve_expr(expected_joint_pos, go1_entity.joint_names)
+  assert expected_joint_pos is not None
+  expected_values = resolve_expr(expected_joint_pos, go1_entity.joint_names, 0.0)
   for joint_name, expected_value in zip(
     go1_entity.joint_names, expected_values, strict=True
   ):

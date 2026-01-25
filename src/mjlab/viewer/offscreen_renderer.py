@@ -1,10 +1,12 @@
+"""MuJoCo offscreen renderer for headless visualization."""
+
 from typing import Any, Callable
 
 import mujoco
 import numpy as np
 
 from mjlab.scene import Scene
-from mjlab.viewer.mujoco_native_visualizer import MujocoNativeDebugVisualizer
+from mjlab.viewer.native.visualizer import MujocoNativeDebugVisualizer
 from mjlab.viewer.viewer_config import ViewerConfig
 
 _MAX_ENVS = 32  # Max number of envs to visualize (for performance).
@@ -52,16 +54,22 @@ class OffscreenRenderer:
     self,
     data: Any,
     debug_vis_callback: Callable[[MujocoNativeDebugVisualizer], None] | None = None,
+    camera: str | None = None,
   ) -> None:
     """Update renderer with simulation data."""
     if self._renderer is None:
       raise ValueError("Renderer not initialized. Call 'initialize()' first.")
 
     env_idx = self._cfg.env_idx
-    self._data.qpos[:] = data.qpos[env_idx].cpu().numpy()
-    self._data.qvel[:] = data.qvel[env_idx].cpu().numpy()
+    if self._model.nq > 0:
+      self._data.qpos[:] = data.qpos[env_idx].cpu().numpy()
+      self._data.qvel[:] = data.qvel[env_idx].cpu().numpy()
+    if self._model.nmocap > 0:
+      self._data.mocap_pos[:] = data.mocap_pos[env_idx].cpu().numpy()
+      self._data.mocap_quat[:] = data.mocap_quat[env_idx].cpu().numpy()
     mujoco.mj_forward(self._model, self._data)
-    self._renderer.update_scene(self._data, camera=self._cam)
+    cam = camera if camera is not None else self._cam
+    self._renderer.update_scene(self._data, camera=cam)
 
     # Note: update_scene() resets the scene each frame, so no need to manually clear.
     if debug_vis_callback is not None:
@@ -71,10 +79,14 @@ class OffscreenRenderer:
       debug_vis_callback(visualizer)
 
     # Add additional environments as geoms.
-    nworld = data.qpos.shape[0]
+    nworld = data.nworld
     for i in range(min(nworld, _MAX_ENVS)):
-      self._data.qpos[:] = data.qpos[i].cpu().numpy()
-      self._data.qvel[:] = data.qvel[i].cpu().numpy()
+      if self._model.nq > 0:
+        self._data.qpos[:] = data.qpos[i].cpu().numpy()
+        self._data.qvel[:] = data.qvel[i].cpu().numpy()
+      if self._model.nmocap > 0:
+        self._data.mocap_pos[:] = data.mocap_pos[i].cpu().numpy()
+        self._data.mocap_quat[:] = data.mocap_quat[i].cpu().numpy()
       mujoco.mj_forward(self._model, self._data)
       mujoco.mjv_addGeoms(
         self._model,
@@ -105,8 +117,8 @@ class OffscreenRenderer:
     elif self._cfg.origin_type == self._cfg.OriginType.ASSET_ROOT:
       from mjlab.entity import Entity
 
-      if self._cfg.asset_name:
-        robot: Entity = self._scene[self._cfg.asset_name]
+      if self._cfg.entity_name:
+        robot: Entity = self._scene[self._cfg.entity_name]
       else:
         # Auto-detect if only one entity.
         if len(self._scene.entities) == 1:
@@ -114,7 +126,7 @@ class OffscreenRenderer:
         else:
           raise ValueError(
             f"Multiple entities in scene ({len(self._scene.entities)}). "
-            "Specify asset_name to choose which one."
+            "Specify entity_name to choose which one."
           )
 
       body_id = robot.indexing.root_body_id
@@ -123,15 +135,15 @@ class OffscreenRenderer:
       camera.fixedcamid = -1
 
     elif self._cfg.origin_type == self._cfg.OriginType.ASSET_BODY:
-      if not self._cfg.asset_name or not self._cfg.body_name:
-        raise ValueError("asset_name/body_name required for ASSET_BODY origin type")
+      if not self._cfg.entity_name or not self._cfg.body_name:
+        raise ValueError("entity_name/body_name required for ASSET_BODY origin type")
 
       from mjlab.entity import Entity
 
-      robot: Entity = self._scene[self._cfg.asset_name]
+      robot: Entity = self._scene[self._cfg.entity_name]
       if self._cfg.body_name not in robot.body_names:
         raise ValueError(
-          f"Body '{self._cfg.body_name}' not found in asset '{self._cfg.asset_name}'"
+          f"Body '{self._cfg.body_name}' not found in asset '{self._cfg.entity_name}'"
         )
       body_id_list, _ = robot.find_bodies(self._cfg.body_name)
       body_id = robot.indexing.bodies[body_id_list[0]].id

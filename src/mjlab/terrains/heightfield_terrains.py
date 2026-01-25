@@ -242,9 +242,9 @@ class HfPyramidSlopedTerrainCfg(SubTerrainCfg):
     )
 
     if self.inverted:
-      spawn_height = hfield_z_offset - base_thickness
+      spawn_height = hfield_z_offset
     else:
-      spawn_height = max_physical_height - base_thickness
+      spawn_height = max_physical_height
 
     origin = np.array([self.size[0] / 2, self.size[1] / 2, spawn_height])
 
@@ -391,7 +391,7 @@ class HfRandomUniformTerrainCfg(SubTerrainCfg):
 @dataclass(kw_only=True)
 class HfWaveTerrainCfg(SubTerrainCfg):
   amplitude_range: tuple[float, float]
-  num_waves: float = 1.0
+  num_waves: int = 1
   horizontal_scale: float = 0.1
   vertical_scale: float = 0.005
   base_thickness_ratio: float = 0.25

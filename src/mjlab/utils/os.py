@@ -1,13 +1,13 @@
 import re
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict
 
 import yaml
 
 
 def update_assets(
   assets: Dict[str, Any],
-  path: Union[str, Path],
+  path: str | Path,
   meshdir: str | None = None,
   glob: str = "*",
   recursive: bool = False,
@@ -63,11 +63,16 @@ def get_checkpoint_path(
   (highest alphabetical order) run and checkpoint are selected. To disable this
   behavior, set `sort_alpha` to `False`.
   """
+  if not log_path.exists():
+    raise ValueError(f"Log path does not exist: {log_path}")
+  # Exclude wandb_checkpoints directory which is used for caching downloaded checkpoints.
   runs = [
     log_path / run.name
     for run in log_path.iterdir()
-    if run.is_dir() and re.match(run_dir, run.name)
+    if run.is_dir() and run.name != "wandb_checkpoints" and re.match(run_dir, run.name)
   ]
+  if len(runs) == 0:
+    raise ValueError(f"No run directories found in {log_path} matching '{run_dir}'")
   if sort_alpha:
     runs.sort()
   else:

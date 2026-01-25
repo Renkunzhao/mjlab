@@ -12,7 +12,7 @@ from mjlab.scripts.play import PlayConfig, run_play
 
 def main() -> None:
   """Run demo with pretrained tracking policy."""
-  print("🎮 Setting up MJLab demo with pretrained tracking policy...")
+  print("🎮 Setting up mjlab demo with pretrained tracking policy...")
 
   try:
     checkpoint_path = ensure_default_checkpoint()
@@ -29,7 +29,7 @@ def main() -> None:
       motion_file=motion_path,
       num_envs=8,
       viewer="viser",
-      motion_command_sampling_mode="uniform",
+      _demo_mode=True,
     ),
   )
   run_play("Mjlab-Tracking-Flat-Unitree-G1", args)

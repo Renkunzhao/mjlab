@@ -6,9 +6,9 @@ import pytest
 import torch
 from conftest import get_test_device
 
+from mjlab import actuator
 from mjlab.envs.mdp import events
-from mjlab.managers.event_manager import EventManager
-from mjlab.managers.manager_term_config import EventTermCfg
+from mjlab.managers.event_manager import EventManager, EventTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 
 
@@ -117,3 +117,244 @@ def test_class_based_event_with_domain_randomization(device):
 
   # Verify that non-DR event is not tracked.
   assert len(manager.domain_randomization_fields) == 2
+
+
+def test_randomize_pd_gains(device):
+  """Test PD gain randomization."""
+  env = Mock()
+  env.num_envs = 2
+  env.device = device
+
+  mock_entity = Mock()
+
+  builtin_actuator = Mock(spec=actuator.BuiltinPositionActuator)
+  builtin_actuator.ctrl_ids = torch.tensor([0, 1], device=device)
+
+  xml_actuator = Mock(spec=actuator.XmlPositionActuator)
+  xml_actuator.ctrl_ids = torch.tensor([2, 3], device=device)
+
+  ideal_actuator = Mock(spec=actuator.IdealPdActuator)
+  ideal_actuator.ctrl_ids = torch.tensor([4, 5], device=device)
+  ideal_actuator.stiffness = torch.tensor(
+    [[100.0, 100.0], [100.0, 100.0]], device=device
+  )
+  ideal_actuator.damping = torch.tensor([[10.0, 10.0], [10.0, 10.0]], device=device)
+
+  ideal_actuator.set_gains = actuator.IdealPdActuator.set_gains.__get__(ideal_actuator)
+
+  mock_entity.actuators = [builtin_actuator, xml_actuator, ideal_actuator]
+  env.scene = {"robot": mock_entity}
+
+  env.sim = Mock()
+  env.sim.model = Mock()
+  env.sim.model.actuator_gainprm = torch.ones((2, 6, 10), device=device) * 50.0
+  env.sim.model.actuator_biasprm = torch.zeros((2, 6, 10), device=device)
+  env.sim.model.actuator_biasprm[:, :, 1] = -50.0  # -Kp
+  env.sim.model.actuator_biasprm[:, :, 2] = -5.0  # -Kd
+
+  # Mock get_default_field for scale operation.
+  default_fields = {
+    "actuator_gainprm": torch.ones((6, 10), device=device) * 50.0,
+    "actuator_biasprm": torch.zeros((6, 10), device=device),
+  }
+  default_fields["actuator_biasprm"][:, 1] = -50.0
+  default_fields["actuator_biasprm"][:, 2] = -5.0
+  env.sim.get_default_field = lambda field: default_fields[field]
+
+  # Mock default gains for IdealPdActuator.
+  ideal_actuator.default_stiffness = torch.tensor(
+    [[100.0, 100.0], [100.0, 100.0]], device=device
+  )
+  ideal_actuator.default_damping = torch.tensor(
+    [[10.0, 10.0], [10.0, 10.0]], device=device
+  )
+
+  # Test scale operation.
+  events.randomize_pd_gains(
+    env,
+    torch.tensor([0], device=device),
+    kp_range=(1.5, 1.5),  # 1.5x scale
+    kd_range=(2.0, 2.0),  # 2.0x scale
+    asset_cfg=SceneEntityCfg("robot"),
+    distribution="uniform",
+    operation="scale",
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_gainprm[0, [0, 1], 0],
+    torch.tensor([75.0, 75.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[0, [0, 1], 1],
+    torch.tensor([-75.0, -75.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[0, [0, 1], 2],
+    torch.tensor([-10.0, -10.0], device=device),
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_gainprm[0, [2, 3], 0],
+    torch.tensor([75.0, 75.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[0, [2, 3], 1],
+    torch.tensor([-75.0, -75.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[0, [2, 3], 2],
+    torch.tensor([-10.0, -10.0], device=device),
+  )
+
+  assert torch.allclose(
+    ideal_actuator.stiffness[0],
+    torch.tensor([150.0, 150.0], device=device),
+  )
+  assert torch.allclose(
+    ideal_actuator.damping[0],
+    torch.tensor([20.0, 20.0], device=device),
+  )
+
+  # Test abs operation.
+  events.randomize_pd_gains(
+    env,
+    torch.tensor([1], device=device),
+    kp_range=(200.0, 200.0),
+    kd_range=(25.0, 25.0),
+    asset_cfg=SceneEntityCfg("robot"),
+    distribution="uniform",
+    operation="abs",
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_gainprm[1, [0, 1], 0],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[1, [0, 1], 1],
+    torch.tensor([-200.0, -200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[1, [0, 1], 2],
+    torch.tensor([-25.0, -25.0], device=device),
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_gainprm[1, [2, 3], 0],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[1, [2, 3], 1],
+    torch.tensor([-200.0, -200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_biasprm[1, [2, 3], 2],
+    torch.tensor([-25.0, -25.0], device=device),
+  )
+
+  assert torch.allclose(
+    ideal_actuator.stiffness[1],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+  assert torch.allclose(
+    ideal_actuator.damping[1],
+    torch.tensor([25.0, 25.0], device=device),
+  )
+
+
+def test_randomize_effort_limits(device):
+  """Test effort limit randomization."""
+  env = Mock()
+  env.num_envs = 2
+  env.device = device
+
+  mock_entity = Mock()
+
+  builtin_actuator = Mock(spec=actuator.BuiltinPositionActuator)
+  builtin_actuator.ctrl_ids = torch.tensor([0, 1], device=device)
+
+  xml_actuator = Mock(spec=actuator.XmlPositionActuator)
+  xml_actuator.ctrl_ids = torch.tensor([2, 3], device=device)
+
+  ideal_actuator = Mock(spec=actuator.IdealPdActuator)
+  ideal_actuator.ctrl_ids = torch.tensor([4, 5], device=device)
+  ideal_actuator.force_limit = torch.tensor([[50.0, 50.0], [50.0, 50.0]], device=device)
+
+  ideal_actuator.set_effort_limit = actuator.IdealPdActuator.set_effort_limit.__get__(
+    ideal_actuator
+  )
+
+  mock_entity.actuators = [builtin_actuator, xml_actuator, ideal_actuator]
+  env.scene = {"robot": mock_entity}
+
+  env.sim = Mock()
+  env.sim.model = Mock()
+  env.sim.model.actuator_forcerange = torch.zeros((2, 6, 2), device=device)
+  env.sim.model.actuator_forcerange[:, :, 0] = -100.0  # Lower limit
+  env.sim.model.actuator_forcerange[:, :, 1] = 100.0  # Upper limit
+
+  # Test scale operation.
+  events.randomize_effort_limits(
+    env,
+    torch.tensor([0], device=device),
+    effort_limit_range=(2.0, 2.0),  # 2x scale
+    asset_cfg=SceneEntityCfg("robot"),
+    distribution="uniform",
+    operation="scale",
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [0, 1], 0],
+    torch.tensor([-200.0, -200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [0, 1], 1],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [2, 3], 0],
+    torch.tensor([-200.0, -200.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[0, [2, 3], 1],
+    torch.tensor([200.0, 200.0], device=device),
+  )
+
+  assert torch.allclose(
+    ideal_actuator.force_limit[0],
+    torch.tensor([100.0, 100.0], device=device),
+  )
+
+  # Test abs operation.
+  events.randomize_effort_limits(
+    env,
+    torch.tensor([1], device=device),
+    effort_limit_range=(150.0, 150.0),
+    asset_cfg=SceneEntityCfg("robot"),
+    distribution="uniform",
+    operation="abs",
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [0, 1], 0],
+    torch.tensor([-150.0, -150.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [0, 1], 1],
+    torch.tensor([150.0, 150.0], device=device),
+  )
+
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [2, 3], 0],
+    torch.tensor([-150.0, -150.0], device=device),
+  )
+  assert torch.allclose(
+    env.sim.model.actuator_forcerange[1, [2, 3], 1],
+    torch.tensor([150.0, 150.0], device=device),
+  )
+
+  assert torch.allclose(
+    ideal_actuator.force_limit[1],
+    torch.tensor([150.0, 150.0], device=device),
+  )

@@ -177,12 +177,32 @@ class DelayBuffer:
     """Current lag per environment. Shape: (batch_size,)."""
     return self._current_lags
 
-  def reset(self, batch_ids: Sequence[int] | torch.Tensor | None = None) -> None:
+  def set_lags(
+    self,
+    lags: torch.Tensor,
+    batch_ids: Sequence[int] | torch.Tensor | slice | None = None,
+  ) -> None:
+    """Set lag values for specified environments.
+
+    Args:
+      lags: Lag values to set. Shape: (num_batch_ids,) or scalar.
+      batch_ids: Batch indices to set, or None to set all.
+    """
+    idx = slice(None) if batch_ids is None else batch_ids
+    self._current_lags[idx] = lags.clamp(self.min_lag, self.max_lag)
+
+  def reset(
+    self, batch_ids: Sequence[int] | torch.Tensor | slice | None = None
+  ) -> None:
     """Reset specified environments to initial state.
 
     Args:
       batch_ids: Batch indices to reset, or None to reset all.
     """
+    if isinstance(batch_ids, slice):
+      indices = range(*batch_ids.indices(self.batch_size))
+      batch_ids = list(indices)
+
     self._buffer.reset(batch_ids=batch_ids)
     idx = slice(None) if batch_ids is None else batch_ids
     self._current_lags[idx] = 0

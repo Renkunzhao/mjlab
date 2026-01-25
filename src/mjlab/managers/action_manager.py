@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Sequence
 
 import torch
@@ -11,17 +12,41 @@ from prettytable import PrettyTable
 from mjlab.managers.manager_base import ManagerBase, ManagerTermBase
 
 if TYPE_CHECKING:
-  from mjlab.envs.manager_based_env import ManagerBasedEnv
-  from mjlab.managers.manager_term_config import ActionTermCfg
+  from mjlab.envs import ManagerBasedRlEnv
+
+
+@dataclass(kw_only=True)
+class ActionTermCfg(abc.ABC):
+  """Configuration for an action term.
+
+  Action terms process raw actions from the policy and apply them to entities
+  in the scene (e.g., setting joint positions, velocities, or efforts).
+  """
+
+  entity_name: str
+  """Name of the entity in the scene that this action term controls."""
+
+  clip: dict[str, tuple] | None = None
+  """Optional clipping bounds per transmission type. Maps transmission name
+  (e.g., 'position', 'velocity') to (min, max) tuple."""
+
+  @abc.abstractmethod
+  def build(self, env: ManagerBasedRlEnv) -> ActionTerm:
+    """Build the action term from this config."""
+    raise NotImplementedError
 
 
 class ActionTerm(ManagerTermBase):
-  """Base class for action terms."""
+  """Base class for action terms.
 
-  def __init__(self, cfg: ActionTermCfg, env: ManagerBasedEnv):
+  The action term is responsible for processing the raw actions sent to the environment
+  and applying them to the entity managed by the term.
+  """
+
+  def __init__(self, cfg: ActionTermCfg, env: ManagerBasedRlEnv):
     self.cfg = cfg
     super().__init__(env)
-    self._asset = self._env.scene[self.cfg.asset_name]
+    self._entity = self._env.scene[self.cfg.entity_name]
 
   @property
   @abc.abstractmethod
@@ -43,7 +68,14 @@ class ActionTerm(ManagerTermBase):
 
 
 class ActionManager(ManagerBase):
-  def __init__(self, cfg: dict[str, ActionTermCfg], env: ManagerBasedEnv):
+  """Manages action processing for the environment.
+
+  The action manager aggregates multiple action terms, each controlling a different
+  entity or aspect of the simulation. It splits the policy's action tensor and
+  routes each slice to the appropriate action term.
+  """
+
+  def __init__(self, cfg: dict[str, ActionTermCfg], env: ManagerBasedRlEnv):
     self.cfg = cfg
     super().__init__(env=env)
 
@@ -52,6 +84,7 @@ class ActionManager(ManagerBase):
       (self.num_envs, self.total_action_dim), device=self.device
     )
     self._prev_action = torch.zeros_like(self._action)
+    self._prev_prev_action = torch.zeros_like(self._action)
 
   def __str__(self) -> str:
     msg = f"<ActionManager> contains {len(self._term_names)} active terms.\n"
@@ -85,6 +118,10 @@ class ActionManager(ManagerBase):
     return self._prev_action
 
   @property
+  def prev_prev_action(self) -> torch.Tensor:
+    return self._prev_prev_action
+
+  @property
   def active_terms(self) -> list[str]:
     return self._term_names
 
@@ -98,6 +135,7 @@ class ActionManager(ManagerBase):
       env_ids = slice(None)
     # Reset action history.
     self._prev_action[env_ids] = 0.0
+    self._prev_prev_action[env_ids] = 0.0
     self._action[env_ids] = 0.0
     # Reset action terms.
     for term in self._terms.values():
@@ -109,6 +147,7 @@ class ActionManager(ManagerBase):
       raise ValueError(
         f"Invalid action shape, expected: {self.total_action_dim}, received: {action.shape[1]}."
       )
+    self._prev_prev_action[:] = self._prev_action
     self._prev_action[:] = self._action
     self._action[:] = action.to(self.device)
     # Split and apply.
@@ -142,6 +181,6 @@ class ActionManager(ManagerBase):
       if term_cfg is None:
         print(f"term: {term_name} set to None, skipping...")
         continue
-      term = term_cfg.class_type(term_cfg, self._env)
+      term = term_cfg.build(self._env)
       self._term_names.append(term_name)
       self._terms[term_name] = term
