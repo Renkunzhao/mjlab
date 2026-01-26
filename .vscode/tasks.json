@@ -6,7 +6,6 @@
             "type": "pickString",
             "description": "Select task",
             "options": [
-                "Mjlab-Hopping-Flat-Unitree-Go2", 
                 "Mjlab-Tracking-Flat-Unitree-G1",
                 "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
                 "Mjlab-Velocity-Rough-Unitree-G1",
