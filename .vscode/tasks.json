@@ -69,6 +69,15 @@
             "problemMatcher": []
         },
         {
+            "label": "Train from checkpoint",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train ${input:task} --agent.resume True --env.scene.num-envs 4096 --video ${input:video}",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Play by wandb run path",
             "type": "shell",
             "command": "uv",
@@ -80,7 +89,7 @@
                 "--num_envs", "32",
                 // "--viewer","viser",
                 "--wandb-run-path",
-                "kzren-university-of-wisconsin-madison/mjlab/${input:wandb-run-path}"
+                "${input:wandb-run-path}"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

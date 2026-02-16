@@ -18,3 +18,5 @@ benchmark_results/
 **/_build/*
 **/generated/*
 
+.vscode/
+
