@@ -29,12 +29,9 @@
         },
         {
             "id": "motion",
-            "type": "pickString",
-            "description": "Select task",
-            "options": [
-                "LAFAN1-g1-jumps1_subject1", 
-            ],
-            "default": "LAFAN1-g1-jumps1_subject1"
+            "type": "promptString",
+            "description": "Input motion",
+            "default": ""
         },
         {
             "id": "wandb-run-path",
@@ -62,7 +59,7 @@
         {
             "label": "Train",
             "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name kzren-uw-madison/wandb-registry-Motions/${input:motion} --env.scene.num-envs 4096 --video ${input:video}",
+            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name ${input:motion} --env.scene.num-envs 4096 --video ${input:video}",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
