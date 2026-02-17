@@ -1,0 +1,119 @@
+{
+    "version": "2.0.0",
+    "inputs": [
+        {
+            "id": "task",
+            "type": "pickString",
+            "description": "Select task",
+            "options": [
+                "Mjlab-Tracking-Flat-Unitree-G1",
+                "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
+                "Mjlab-Velocity-Rough-Unitree-G1",
+                "Mjlab-Velocity-Flat-Unitree-G1",
+                "Mjlab-Velocity-Rough-Unitree-Go1",
+                "Mjlab-Velocity-Flat-Unitree-Go1",
+                "Mjlab-Velocity-Rough-Unitree-Go2",
+                "Mjlab-Velocity-Flat-Unitree-Go2"
+            ],
+            "default": "Mjlab-Hopping-Flat-Unitree-Go2"
+        },
+        {
+            "id": "video",
+            "type": "pickString",
+            "description": "Select whether to video",
+            "options": [
+                "True", 
+                "False"
+            ],
+            "default": "False"
+        },
+        {
+            "id": "motion",
+            "type": "pickString",
+            "description": "Select task",
+            "options": [
+                "LAFAN1-g1-jumps1_subject1", 
+            ],
+            "default": "LAFAN1-g1-jumps1_subject1"
+        },
+        {
+            "id": "wandb-run-path",
+            "type": "promptString",
+            "description": "Input wandb run path",
+            "default": ""
+        },
+        {
+            "id": "checkpoint_file",
+            "type": "promptString",
+            "description": "Input checkpoint path",
+            "default": ""
+        },
+    ],  
+    "tasks": [
+        {
+            "label": "List env",
+            "type": "shell",
+            "command": "uv run list_envs",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Train",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name kzren-uw-madison/wandb-registry-Motions/${input:motion} --env.scene.num-envs 4096 --video ${input:video}",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Train from checkpoint",
+            "type": "shell",
+            "command": "MUJOCO_GL=egl uv run train ${input:task} --agent.resume True --env.scene.num-envs 4096 --video ${input:video}",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Play by wandb run path",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "${input:task}",
+                // "--agent", "random",
+                "--num_envs", "32",
+                // "--viewer","viser",
+                "--wandb-run-path",
+                "${input:wandb-run-path}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Play by checkpoint file",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "${input:task}",
+                // "--agent", "random",
+                "--num_envs", "32",
+                // "--viewer","viser",
+                "--checkpoint_file",
+                "${input:checkpoint_file}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
