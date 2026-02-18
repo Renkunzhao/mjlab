@@ -18,6 +18,24 @@
             "default": "Mjlab-Hopping-Flat-Unitree-Go2"
         },
         {
+            "id": "input-file",
+            "type": "promptString",
+            "description": "Type input motion file",
+            "default": ""
+        },
+        {
+            "id": "output-name",
+            "type": "promptString",
+            "description": "Type output motion name",
+            "default": ""
+        },
+        {
+            "id": "registry-name",
+            "type": "promptString",
+            "description": "Type registry name",
+            "default": ""
+        },
+        {
             "id": "video",
             "type": "pickString",
             "description": "Select whether to render video",
@@ -38,28 +56,26 @@
             "default": "False"
         },
         {
-            "id": "InputFile",
-            "type": "promptString",
-            "description": "Type input file",
-            "default": ""
-        },
-        {
-            "id": "motion",
-            "type": "promptString",
-            "description": "Input motion",
-            "default": ""
-        },
-        {
             "id": "wandb-run-path",
             "type": "promptString",
-            "description": "Input wandb run path",
+            "description": "Type wandb run path",
             "default": ""
         },
         {
-            "id": "checkpoint_file",
+            "id": "viewer",
+            "type": "pickString",
+            "description": "Select viewer",
+            "options": [
+                "native", 
+                "viser"
+            ],
+            "default": "viser"
+        },
+        {
+            "id": "num_envs",
             "type": "promptString",
-            "description": "Input checkpoint path",
-            "default": ""
+            "description": "Type number of environments",
+            "default": "1"
         },
     ],  
     "tasks": [
@@ -79,8 +95,8 @@
             "args": [
                 "run", "python", "-m",
                 "mjlab.scripts.csv_to_npz",
-                "--input-file", "${input:InputFile}",
-                "--output-name", "${input:motion}",
+                "--input-file", "${input:input-file}",
+                "--output-name", "${input:motion-name}",
                 "--input-fps", "30",
                 "--output-fps", "50",
                 "--render", "${input:video}"
@@ -97,8 +113,8 @@
             "args": [
                 "run", "play", "${input:task}",
                 "--agent", "zero",
-                // "--viewer","viser",
-                "--registry-name", "${input:motion}",
+                "--viewer","${input:viewer}",
+                "--registry-name", "${input:registry-name}",
                 "--no-terminations", "True"
             ],
             "options": {
@@ -113,7 +129,7 @@
             "args": [
                 "run", "train", "${input:task}",
                 "--env.scene.num-envs", "4096",
-                "--registry-name", "${input:motion}",
+                "--registry-name", "${input:registry-name}",
                 "--video", "${input:video}",
                 "--agent.resume", "${input:resume}",
                 "--wandb-run-path", "${input:wandb-run-path}"
@@ -124,29 +140,14 @@
             "problemMatcher": []
         },
         {
-            "label": "Play by wandb run path",
+            "label": "Play",
             "type": "shell",
             "command": "uv",
             "args": [
                 "run", "play", "${input:task}",
-                "--num_envs", "32",
-                // "--viewer","viser",
+                "--num_envs", "${input:num_envs}",
+                "--viewer","${input:viewer}",
                 "--wandb-run-path", "${input:wandb-run-path}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Play by checkpoint file",
-            "type": "shell",
-            "command": "uv",
-            "args": [
-                "run", "play", "${input:task}",
-                "--num_envs", "32",
-                // "--viewer","viser",
-                "--checkpoint_file", "${input:checkpoint_file}"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
