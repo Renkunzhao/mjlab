@@ -20,7 +20,17 @@
         {
             "id": "video",
             "type": "pickString",
-            "description": "Select whether to video",
+            "description": "Select whether to render video",
+            "options": [
+                "True", 
+                "False"
+            ],
+            "default": "False"
+        },
+        {
+            "id": "resume",
+            "type": "pickString",
+            "description": "Select whether to resume training",
             "options": [
                 "True", 
                 "False"
@@ -85,13 +95,10 @@
             "type": "shell",
             "command": "uv",
             "args": [
-                "run",
-                "play",
-                "${input:task}",
+                "run", "play", "${input:task}",
                 "--agent", "zero",
                 // "--viewer","viser",
-                "--registry-name",
-                "${input:motion}",
+                "--registry-name", "${input:motion}",
                 "--no-terminations", "True"
             ],
             "options": {
@@ -102,16 +109,15 @@
         {
             "label": "Train",
             "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train ${input:task} --registry-name ${input:motion} --env.scene.num-envs 4096 --video ${input:video}",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Train from checkpoint",
-            "type": "shell",
-            "command": "MUJOCO_GL=egl uv run train ${input:task} --agent.resume True --env.scene.num-envs 4096 --video ${input:video}",
+            "command": "uv",
+            "args": [
+                "run", "train", "${input:task}",
+                "--env.scene.num-envs", "4096",
+                "--registry-name", "${input:motion}",
+                "--video", "${input:video}",
+                "--agent.resume", "${input:resume}",
+                "--wandb-run-path", "${input:wandb-run-path}"
+            ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -122,13 +128,10 @@
             "type": "shell",
             "command": "uv",
             "args": [
-                "run",
-                "play",
-                "${input:task}",
+                "run", "play", "${input:task}",
                 "--num_envs", "32",
                 // "--viewer","viser",
-                "--wandb-run-path",
-                "${input:wandb-run-path}"
+                "--wandb-run-path", "${input:wandb-run-path}"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -140,13 +143,10 @@
             "type": "shell",
             "command": "uv",
             "args": [
-                "run",
-                "play",
-                "${input:task}",
+                "run", "play", "${input:task}",
                 "--num_envs", "32",
                 // "--viewer","viser",
-                "--checkpoint_file",
-                "${input:checkpoint_file}"
+                "--checkpoint_file", "${input:checkpoint_file}"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
