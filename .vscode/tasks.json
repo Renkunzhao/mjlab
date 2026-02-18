@@ -28,6 +28,12 @@
             "default": "False"
         },
         {
+            "id": "InputFile",
+            "type": "promptString",
+            "description": "Type input file",
+            "default": ""
+        },
+        {
             "id": "motion",
             "type": "promptString",
             "description": "Input motion",
@@ -51,6 +57,43 @@
             "label": "List env",
             "type": "shell",
             "command": "uv run list_envs",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Convert motion",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run", "python", "-m",
+                "mjlab.scripts.csv_to_npz",
+                "--input-file", "${input:InputFile}",
+                "--output-name", "${input:motion}",
+                "--input-fps", "30",
+                "--output-fps", "50",
+                "--render", "${input:video}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Visualize motion",
+            "type": "shell",
+            "command": "uv",
+            "args": [
+                "run",
+                "play",
+                "${input:task}",
+                "--agent", "zero",
+                // "--viewer","viser",
+                "--registry-name",
+                "${input:motion}",
+                "--no-terminations", "True"
+            ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -82,7 +125,6 @@
                 "run",
                 "play",
                 "${input:task}",
-                // "--agent", "random",
                 "--num_envs", "32",
                 // "--viewer","viser",
                 "--wandb-run-path",
@@ -101,7 +143,6 @@
                 "run",
                 "play",
                 "${input:task}",
-                // "--agent", "random",
                 "--num_envs", "32",
                 // "--viewer","viser",
                 "--checkpoint_file",
