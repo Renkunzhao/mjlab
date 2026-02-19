@@ -24,9 +24,9 @@
             "default": ""
         },
         {
-            "id": "output-name",
+            "id": "run-name",
             "type": "promptString",
-            "description": "Type output motion name",
+            "description": "Type wandb run name",
             "default": ""
         },
         {
@@ -96,7 +96,7 @@
                 "run", "python", "-m",
                 "mjlab.scripts.csv_to_npz",
                 "--input-file", "${input:input-file}",
-                "--output-name", "${input:motion-name}",
+                "--run-name", "${input:run-name}",
                 "--input-fps", "30",
                 "--output-fps", "50",
                 "--render", "${input:video}"
@@ -131,6 +131,7 @@
                 "--env.scene.num-envs", "4096",
                 "--registry-name", "${input:registry-name}",
                 "--video", "${input:video}",
+                "--agent.run-name", "${input:run-name}",
                 "--agent.resume", "${input:resume}",
                 "--wandb-run-path", "${input:wandb-run-path}"
             ],
