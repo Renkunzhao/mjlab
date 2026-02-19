@@ -31,11 +31,24 @@ _DESIRED_FRAME_COLORS = ((1.0, 0.5, 0.5), (0.5, 1.0, 0.5), (0.5, 0.5, 1.0))
 
 class MotionLoader:
   def __init__(
-    self, motion_file: str, body_indexes: torch.Tensor, device: str = "cpu"
+    self,
+    motion_file: str,
+    body_indexes: torch.Tensor,
+    use_joint_tau: bool = False,
+    device: str = "cpu",
   ) -> None:
     data = np.load(motion_file)
     self.joint_pos = torch.tensor(data["joint_pos"], dtype=torch.float32, device=device)
     self.joint_vel = torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
+    self.joint_tau: torch.Tensor | None = None
+    if use_joint_tau:
+      if "joint_tau" not in data:
+        raise ValueError(
+          "Motion file is missing required key 'joint_tau' while use_joint_tau=True."
+        )
+      self.joint_tau = torch.tensor(
+        data["joint_tau"], dtype=torch.float32, device=device
+      )
     self._body_pos_w = torch.tensor(
       data["body_pos_w"], dtype=torch.float32, device=device
     )
@@ -75,7 +88,10 @@ class MotionCommand(CommandTerm):
     )
 
     self.motion = MotionLoader(
-      self.cfg.motion_file, self.body_indexes, device=self.device
+      self.cfg.motion_file,
+      self.body_indexes,
+      use_joint_tau=self.cfg.use_joint_tau,
+      device=self.device,
     )
     self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
     self.body_pos_relative_w = torch.zeros(
@@ -121,7 +137,15 @@ class MotionCommand(CommandTerm):
 
   @property
   def command(self) -> torch.Tensor:
+    return self.command_no_tau
+
+  @property
+  def command_no_tau(self) -> torch.Tensor:
     return torch.cat([self.joint_pos, self.joint_vel], dim=1)
+
+  @property
+  def command_with_tau(self) -> torch.Tensor:
+    return torch.cat([self.joint_pos, self.joint_vel, self.joint_tau], dim=1)
 
   @property
   def joint_pos(self) -> torch.Tensor:
@@ -130,6 +154,14 @@ class MotionCommand(CommandTerm):
   @property
   def joint_vel(self) -> torch.Tensor:
     return self.motion.joint_vel[self.time_steps]
+
+  @property
+  def joint_tau(self) -> torch.Tensor:
+    if self.motion.joint_tau is None:
+      raise RuntimeError(
+        "joint_tau is not available. Set MotionCommandCfg.use_joint_tau=True."
+      )
+    return self.motion.joint_tau[self.time_steps]
 
   @property
   def body_pos_w(self) -> torch.Tensor:
@@ -476,6 +508,7 @@ class MotionCommandCfg(CommandTermCfg):
   anchor_body_name: str
   body_names: tuple[str, ...]
   entity_name: str
+  use_joint_tau: bool = False
   pose_range: dict[str, tuple[float, float]] = field(default_factory=dict)
   velocity_range: dict[str, tuple[float, float]] = field(default_factory=dict)
   joint_position_range: tuple[float, float] = (-0.52, 0.52)

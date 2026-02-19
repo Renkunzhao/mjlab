@@ -19,3 +19,20 @@ register_mjlab_task(
   rl_cfg=unitree_g1_tracking_ppo_runner_cfg(),
   runner_cls=MotionTrackingOnPolicyRunner,
 )
+
+register_mjlab_task(
+  task_id="Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation-Torque",
+  env_cfg=unitree_g1_flat_tracking_env_cfg(
+    has_state_estimation=False,
+    tau_mode="actor_critic",
+    tau_filter="mean",
+  ),
+  play_env_cfg=unitree_g1_flat_tracking_env_cfg(
+    has_state_estimation=False,
+    tau_mode="actor_critic",
+    tau_filter="mean",
+    play=True,
+  ),
+  rl_cfg=unitree_g1_tracking_ppo_runner_cfg(),
+  runner_cls=MotionTrackingOnPolicyRunner,
+)

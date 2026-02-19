@@ -45,7 +45,8 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
 
   actor_terms = {
     "command": ObservationTermCfg(
-      func=mdp.generated_commands, params={"command_name": "motion"}
+      func=mdp.command,
+      params={"command_name": "motion", "with_joint_tau": False},
     ),
     "motion_anchor_pos_b": ObservationTermCfg(
       func=mdp.motion_anchor_pos_b,
@@ -75,12 +76,18 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     "joint_vel": ObservationTermCfg(
       func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5)
     ),
+    # Full tracking observation set. Per-task cfg can remove this term via flags.
+    "joint_torque": ObservationTermCfg(
+      func=mdp.joint_torque,
+      params={"sensor_name": "joint_torque", "mode": "mean"},
+    ),
     "actions": ObservationTermCfg(func=mdp.last_action),
   }
 
   critic_terms = {
     "command": ObservationTermCfg(
-      func=mdp.generated_commands, params={"command_name": "motion"}
+      func=mdp.command,
+      params={"command_name": "motion", "with_joint_tau": False},
     ),
     "motion_anchor_pos_b": ObservationTermCfg(
       func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}
@@ -102,6 +109,11 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "joint_pos": ObservationTermCfg(func=mdp.joint_pos_rel),
     "joint_vel": ObservationTermCfg(func=mdp.joint_vel_rel),
+    # Full tracking observation set. Per-task cfg can remove this term via flags.
+    "joint_torque": ObservationTermCfg(
+      func=mdp.joint_torque,
+      params={"sensor_name": "joint_torque", "mode": "mean"},
+    ),
     "actions": ObservationTermCfg(func=mdp.last_action),
   }
 
@@ -239,6 +251,17 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
       func=mdp.motion_global_body_angular_velocity_error_exp,
       weight=1.0,
       params={"command_name": "motion", "std": 3.14},
+    ),
+    # Full tracking reward set. Per-task cfg can remove this term via flags.
+    "motion_joint_torque": RewardTermCfg(
+      func=mdp.motion_joint_torque_error_exp,
+      weight=0.5,
+      params={
+        "command_name": "motion",
+        "sensor_name": "joint_torque",
+        "filter_mode": "mean",
+        "std": 1.0,
+      },
     ),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-1e-1),
     "joint_limit": RewardTermCfg(

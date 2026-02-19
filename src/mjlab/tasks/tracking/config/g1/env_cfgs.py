@@ -1,5 +1,7 @@
 """Unitree G1 flat tracking environment configurations."""
 
+from typing import Literal
+
 from mjlab.asset_zoo.robots import (
   G1_ACTION_SCALE,
   get_g1_robot_cfg,
@@ -7,16 +9,26 @@ from mjlab.asset_zoo.robots import (
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg
-from mjlab.sensor import ContactMatch, ContactSensorCfg
+from mjlab.sensor import ContactMatch, ContactSensorCfg, JointTorqueSensorCfg
 from mjlab.tasks.tracking.mdp import MotionCommandCfg
 from mjlab.tasks.tracking.tracking_env_cfg import make_tracking_env_cfg
+
+TauMode = Literal["off", "reward", "critic", "actor_critic"]
+TauFilter = Literal["mean", "last"]
 
 
 def unitree_g1_flat_tracking_env_cfg(
   has_state_estimation: bool = True,
+  tau_mode: TauMode = "off",
+  tau_filter: TauFilter = "mean",
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
   """Create Unitree G1 flat terrain tracking configuration."""
+  if tau_mode not in {"off", "reward", "critic", "actor_critic"}:
+    raise ValueError(f"Unsupported tau_mode '{tau_mode}'.")
+  if tau_filter not in {"mean", "last"}:
+    raise ValueError(f"Unsupported tau_filter '{tau_filter}'.")
+
   cfg = make_tracking_env_cfg()
 
   cfg.scene.entities = {"robot": get_g1_robot_cfg()}
@@ -29,7 +41,16 @@ def unitree_g1_flat_tracking_env_cfg(
     reduce="none",
     num_slots=1,
   )
-  cfg.scene.sensors = (self_collision_cfg,)
+  scene_sensors = [self_collision_cfg]
+  if tau_mode != "off":
+    scene_sensors.append(
+      JointTorqueSensorCfg(
+        name="joint_torque",
+        entity_name="robot",
+        window_length=cfg.decimation,
+      )
+    )
+  cfg.scene.sensors = tuple(scene_sensors)
 
   joint_pos_action = cfg.actions["joint_pos"]
   assert isinstance(joint_pos_action, JointPositionActionCfg)
@@ -54,6 +75,31 @@ def unitree_g1_flat_tracking_env_cfg(
     "right_elbow_link",
     "right_wrist_yaw_link",
   )
+  motion_cmd.use_joint_tau = tau_mode != "off"
+
+  actor_terms = cfg.observations["actor"].terms
+  critic_terms = cfg.observations["critic"].terms
+  actor_terms["command"].params["with_joint_tau"] = tau_mode == "actor_critic"
+  critic_terms["command"].params["with_joint_tau"] = tau_mode in (
+    "critic",
+    "actor_critic",
+  )
+
+  # Keep full obs/reward terms in tracking_env_cfg, then remove by mode flags.
+  if tau_mode != "actor_critic":
+    actor_terms.pop("joint_torque", None)
+  else:
+    actor_terms["joint_torque"].params["mode"] = tau_filter
+
+  if tau_mode not in ("critic", "actor_critic"):
+    critic_terms.pop("joint_torque", None)
+  else:
+    critic_terms["joint_torque"].params["mode"] = tau_filter
+
+  if tau_mode == "off":
+    cfg.rewards.pop("motion_joint_torque", None)
+  else:
+    cfg.rewards["motion_joint_torque"].params["filter_mode"] = tau_filter
 
   cfg.events["foot_friction"].params[
     "asset_cfg"

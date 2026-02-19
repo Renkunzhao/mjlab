@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import torch
 
+from mjlab.sensor import JointTorqueSensor
 from mjlab.utils.lab_api.math import (
   matrix_from_quat,
   subtract_frame_transforms,
@@ -13,6 +14,26 @@ from .commands import MotionCommand
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
+
+
+def command(
+  env: ManagerBasedRlEnv, command_name: str, with_joint_tau: bool = False
+) -> torch.Tensor:
+  command_term = cast(MotionCommand, env.command_manager.get_term(command_name))
+  if with_joint_tau:
+    return command_term.command_with_tau
+  return command_term.command_no_tau
+
+
+def joint_torque(
+  env: ManagerBasedRlEnv, sensor_name: str, mode: Literal["mean", "last"]
+) -> torch.Tensor:
+  sensor = env.scene[sensor_name]
+  if not isinstance(sensor, JointTorqueSensor):
+    raise TypeError(
+      f"Sensor '{sensor_name}' must be JointTorqueSensor, got {type(sensor).__name__}."
+    )
+  return sensor.get_torque(mode)
 
 
 def motion_anchor_pos_b(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:

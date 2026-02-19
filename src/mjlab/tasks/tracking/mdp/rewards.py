@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import torch
 
-from mjlab.sensor import ContactSensor
+from mjlab.sensor import ContactSensor, JointTorqueSensor
 from mjlab.utils.lab_api.math import quat_error_magnitude
 
 from .commands import MotionCommand
@@ -118,3 +118,41 @@ def self_collision_cost(env: ManagerBasedRlEnv, sensor_name: str) -> torch.Tenso
   sensor: ContactSensor = env.scene[sensor_name]
   assert sensor.data.found is not None
   return sensor.data.found.squeeze(-1)
+
+
+def motion_joint_torque_error_exp(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  sensor_name: str,
+  filter_mode: Literal["mean", "last"],
+  std: float,
+) -> torch.Tensor:
+  if std <= 0.0:
+    raise ValueError(f"motion_joint_torque_error_exp expects std > 0, got {std}.")
+
+  command = cast(MotionCommand, env.command_manager.get_term(command_name))
+  sensor = env.scene[sensor_name]
+  if not isinstance(sensor, JointTorqueSensor):
+    raise TypeError(
+      f"Sensor '{sensor_name}' must be JointTorqueSensor, got {type(sensor).__name__}."
+    )
+
+  ref_tau = command.joint_tau
+  act_tau = sensor.get_torque(filter_mode)
+  tau_limit = sensor.data.joint_torque_limit
+
+  if ref_tau.shape != act_tau.shape:
+    raise ValueError(
+      "motion_joint_torque_error_exp shape mismatch between reference and actual "
+      "torque: "
+      f"{tuple(ref_tau.shape)} vs {tuple(act_tau.shape)}."
+    )
+  if tau_limit.shape != act_tau.shape:
+    raise ValueError(
+      "motion_joint_torque_error_exp shape mismatch between actual torque and torque "
+      "limits: "
+      f"{tuple(act_tau.shape)} vs {tuple(tau_limit.shape)}."
+    )
+
+  err = (ref_tau - act_tau) / tau_limit
+  return torch.exp(-torch.linalg.norm(err, ord=2, dim=-1) / std)

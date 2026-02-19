@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import numpy as np
@@ -41,20 +42,24 @@ class MotionLoader:
     self._interpolate_motion()
     self._compute_velocities()
 
+  def _load_csv(self, csv_path: str) -> torch.Tensor:
+    if self.line_range is None:
+      data = np.loadtxt(csv_path, delimiter=",")
+    else:
+      data = np.loadtxt(
+        csv_path,
+        delimiter=",",
+        skiprows=self.line_range[0] - 1,
+        max_rows=self.line_range[1] - self.line_range[0] + 1,
+      )
+    tensor = torch.from_numpy(data).to(torch.float32).to(self.device)
+    if tensor.ndim == 1:
+      tensor = tensor.unsqueeze(0)
+    return tensor
+
   def _load_motion(self):
     """Loads the motion from the csv file."""
-    if self.line_range is None:
-      motion = torch.from_numpy(np.loadtxt(self.motion_file, delimiter=","))
-    else:
-      motion = torch.from_numpy(
-        np.loadtxt(
-          self.motion_file,
-          delimiter=",",
-          skiprows=self.line_range[0] - 1,
-          max_rows=self.line_range[1] - self.line_range[0] + 1,
-        )
-      )
-    motion = motion.to(torch.float32).to(self.device)
+    motion = self._load_csv(self.motion_file)
     # motion[:, 2] -= 0.05
     self.motion_base_poss_input = motion[:, :3]
     self.motion_base_rots_input = motion[:, 3:7]
@@ -71,6 +76,7 @@ class MotionLoader:
     times = torch.arange(
       0, self.duration, self.output_dt, device=self.device, dtype=torch.float32
     )
+    self.output_times = times
     self.output_frames = times.shape[0]
     index_0, index_1, blend = self._compute_frame_blend(times)
     self.motion_base_poss = self._lerp(
@@ -119,6 +125,26 @@ class MotionLoader:
     index_1 = torch.minimum(index_0 + 1, torch.tensor(self.input_frames - 1))
     blend = phase * (self.input_frames - 1) - index_0
     return index_0, index_1, blend
+
+  def interpolate_signal(self, csv_file: str, target_times: torch.Tensor) -> torch.Tensor:
+    """Loads and linearly interpolates a CSV signal at target times."""
+    signal = self._load_csv(csv_file)
+    input_frames = signal.shape[0]
+    if input_frames < 2:
+      raise ValueError(
+        f"Signal file '{csv_file}' must contain at least 2 frames, got {input_frames}."
+      )
+    duration = (input_frames - 1) * self.input_dt
+    phase = target_times / duration
+    index_0 = (phase * (input_frames - 1)).floor().long()
+    index_0 = torch.clamp(index_0, 0, input_frames - 1)
+    index_1 = torch.minimum(
+      index_0 + 1,
+      torch.tensor(input_frames - 1, device=self.device, dtype=torch.long),
+    )
+    blend = phase * (input_frames - 1) - index_0
+    blend = torch.clamp(blend, 0.0, 1.0).unsqueeze(1)
+    return self._lerp(signal[index_0], signal[index_1], blend)
 
   def _compute_velocities(self):
     """Computes the velocities of the motion."""
@@ -185,6 +211,7 @@ def run_sim(
   scene: Scene,
   joint_names,
   input_file,
+  torque_file,
   input_fps,
   output_fps,
   output_name,
@@ -212,6 +239,52 @@ def run_sim(
     "body_lin_vel_w": [],
     "body_ang_vel_w": [],
   }
+  torque_csv_file: str | None = None
+  if torque_file is not None:
+    torque_file = torque_file.strip()
+    if torque_file == "":
+      torque_csv_file = None
+    elif not torque_file.lower().endswith(".csv"):
+      print(
+        f"[INFO]: torque_file='{torque_file}' is not a .csv file. "
+        "Skip exporting joint_tau."
+      )
+      torque_csv_file = None
+    elif not os.path.isfile(torque_file):
+      raise FileNotFoundError(f"Torque file not found: {torque_file}")
+    else:
+      torque_csv_file = torque_file
+
+  if torque_csv_file is not None:
+    tau_target_times = motion.output_times[:-1]
+    joint_tau = motion.interpolate_signal(torque_csv_file, tau_target_times)
+    if joint_tau.shape[0] != motion.output_frames - 1:
+      raise ValueError(
+        "Interpolated torque frames must equal motion frames - 1, "
+        f"got {joint_tau.shape[0]} vs {motion.output_frames - 1}."
+      )
+    if joint_tau.shape[1] != len(robot_joint_indexes):
+      raise ValueError(
+        "Torque DoF count must match provided joint_names length, "
+        f"got {joint_tau.shape[1]} vs {len(robot_joint_indexes)}."
+      )
+
+    # Align tau here: tau_aligned[0] = 0, tau_aligned[t] = tau_raw[t-1].
+    joint_tau_aligned = torch.zeros(
+      (motion.output_frames, joint_tau.shape[1]),
+      dtype=joint_tau.dtype,
+      device=joint_tau.device,
+    )
+    joint_tau_aligned[1:] = joint_tau
+
+    # Save in robot joint order (same convention as joint_pos/joint_vel in npz).
+    joint_tau_full = torch.zeros(
+      (motion.output_frames, robot.data.joint_pos.shape[1]),
+      dtype=joint_tau.dtype,
+      device=joint_tau.device,
+    )
+    joint_tau_full[:, robot_joint_indexes] = joint_tau_aligned
+    log["joint_tau"] = joint_tau_full.cpu().numpy()
   file_saved = False
 
   frames = []
@@ -339,6 +412,7 @@ def run_sim(
 def main(
   input_file: str,
   output_name: str,
+  torque_file: str | None = None,
   input_fps: float = 30.0,
   output_fps: float = 50.0,
   device: str = "cuda:0",
@@ -350,6 +424,7 @@ def main(
   Args:
     input_file: Path to the input CSV file.
     output_name: Path to the output npz file.
+    torque_file: Optional path to torque CSV file (tauj). Empty or non-.csv means skip.
     input_fps: Frame rate of the CSV file.
     output_fps: Desired output frame rate.
     device: Device to use.
@@ -423,6 +498,7 @@ def main(
     ],
     input_fps=input_fps,
     input_file=input_file,
+    torque_file=torque_file,
     output_fps=output_fps,
     output_name=output_name,
     render=render,
