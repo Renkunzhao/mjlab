@@ -155,4 +155,6 @@ def motion_joint_torque_error_exp(
     )
 
   err = (ref_tau - act_tau) / tau_limit
-  return torch.exp(-torch.linalg.norm(err, ord=2, dim=-1) / std)
+  err_mse = torch.mean(err * err, dim=-1)
+  return torch.exp(-err_mse / std**2)
+

@@ -260,7 +260,7 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
         "command_name": "motion",
         "sensor_name": "joint_torque",
         "filter_mode": "mean",
-        "std": 1.0,
+        "std": 0.5,
       },
     ),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-1e-1),
@@ -284,7 +284,7 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     "time_out": TerminationTermCfg(func=mdp.time_out, time_out=True),
     "anchor_pos": TerminationTermCfg(
       func=mdp.bad_anchor_pos_z_only,
-      params={"command_name": "motion", "threshold": 0.25},
+      params={"command_name": "motion", "threshold": 1.0},
     ),
     "anchor_ori": TerminationTermCfg(
       func=mdp.bad_anchor_ori,
@@ -298,7 +298,7 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
       func=mdp.bad_motion_body_pos_z_only,
       params={
         "command_name": "motion",
-        "threshold": 0.25,
+        "threshold": 1.0,
         "body_names": (),  # Set per-robot.
       },
     ),

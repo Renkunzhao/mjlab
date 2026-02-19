@@ -93,6 +93,26 @@ class MotionCommand(CommandTerm):
       use_joint_tau=self.cfg.use_joint_tau,
       device=self.device,
     )
+    self._tau_local_ctrl_ids: torch.Tensor | None = None
+    self._tau_global_ctrl_ids: torch.Tensor | None = None
+    if self.motion.joint_tau is not None:
+      joint_name_to_idx = {name: i for i, name in enumerate(self.robot.joint_names)}
+      ordered_pairs: list[tuple[int, int, int]] = []
+      for local_ctrl_idx, actuator in enumerate(self.robot.spec.actuators):
+        joint_name = actuator.target.split("/")[-1]
+        if joint_name not in joint_name_to_idx:
+          continue
+        joint_idx = joint_name_to_idx[joint_name]
+        ordered_pairs.append((joint_idx, local_ctrl_idx, actuator.id))
+
+      ordered_pairs.sort(key=lambda item: item[0])
+      self._tau_local_ctrl_ids = torch.tensor(
+        [item[1] for item in ordered_pairs], dtype=torch.long, device=self.device
+      )
+      self._tau_global_ctrl_ids = torch.tensor(
+        [item[2] for item in ordered_pairs], dtype=torch.long, device=self.device
+      )
+
     self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
     self.body_pos_relative_w = torch.zeros(
       self.num_envs, len(cfg.body_names), 3, device=self.device
@@ -127,6 +147,7 @@ class MotionCommand(CommandTerm):
     self.metrics["error_body_rot"] = torch.zeros(self.num_envs, device=self.device)
     self.metrics["error_joint_pos"] = torch.zeros(self.num_envs, device=self.device)
     self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
+    self.metrics["error_joint_torque"] = torch.zeros(self.num_envs, device=self.device)
     self.metrics["sampling_entropy"] = torch.zeros(self.num_envs, device=self.device)
     self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
     self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
@@ -209,6 +230,23 @@ class MotionCommand(CommandTerm):
     return self.robot.data.joint_vel
 
   @property
+  def robot_joint_torque(self) -> torch.Tensor:
+    if self._tau_local_ctrl_ids is None:
+      return self.robot.data.actuator_force
+    return self.robot.data.actuator_force[:, self._tau_local_ctrl_ids]
+
+  @property
+  def robot_joint_torque_limit(self) -> torch.Tensor:
+    if self._tau_global_ctrl_ids is None:
+      ctrl_ids = self.robot.indexing.ctrl_ids
+    else:
+      ctrl_ids = self._tau_global_ctrl_ids
+    forcerange = self._env.sim.model.actuator_forcerange[:, ctrl_ids]
+    if forcerange.ndim == 2:
+      forcerange = forcerange.unsqueeze(0).expand(self.num_envs, -1, -1)
+    return torch.maximum(forcerange[..., 1].abs(), forcerange[..., 0].abs())
+
+  @property
   def robot_body_pos_w(self) -> torch.Tensor:
     return self.robot.data.body_link_pos_w[:, self.body_indexes]
 
@@ -274,6 +312,29 @@ class MotionCommand(CommandTerm):
     self.metrics["error_joint_vel"] = torch.norm(
       self.joint_vel - self.robot_joint_vel, dim=-1
     )
+
+    if self.motion.joint_tau is None:
+      self.metrics["error_joint_torque"].zero_()
+    else:
+      ref_tau = self.joint_tau
+      act_tau = self.robot_joint_torque
+      tau_limit = self.robot_joint_torque_limit
+
+      if ref_tau.shape != act_tau.shape:
+        raise ValueError(
+          "error_joint_torque shape mismatch between reference and actual torque: "
+          f"{tuple(ref_tau.shape)} vs {tuple(act_tau.shape)}."
+        )
+      if tau_limit.shape != act_tau.shape:
+        raise ValueError(
+          "error_joint_torque shape mismatch between actual torque and torque "
+          f"limits: {tuple(act_tau.shape)} vs {tuple(tau_limit.shape)}."
+        )
+
+      err = (ref_tau - act_tau) / tau_limit
+      self.metrics["error_joint_torque"] = torch.mean(
+        torch.square(err), dim=-1
+      )
 
   def _adaptive_sampling(self, env_ids: torch.Tensor):
     episode_failed = self._env.termination_manager.terminated[env_ids]
