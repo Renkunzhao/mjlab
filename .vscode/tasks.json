@@ -110,7 +110,10 @@
                 "--render", "${input:video}"
             ],
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "MUJOCO_GL": "egl"
+                }
             },
             "problemMatcher": []
         },
@@ -144,7 +147,10 @@
                 "--wandb-run-path", "${input:wandb-run-path}"
             ],
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "MUJOCO_GL": "egl"
+                }
             },
             "problemMatcher": []
         },
