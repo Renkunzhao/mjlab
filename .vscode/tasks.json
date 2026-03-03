@@ -15,7 +15,8 @@
                 "Mjlab-Velocity-Rough-Unitree-Go1",
                 "Mjlab-Velocity-Flat-Unitree-Go1",
                 "Mjlab-Velocity-Rough-Unitree-Go2",
-                "Mjlab-Velocity-Flat-Unitree-Go2"
+                "Mjlab-Velocity-Flat-Unitree-Go2",
+                "Mjlab-Hopping-Flat-Unitree-Go2"
             ],
             "default": "Mjlab-Hopping-Flat-Unitree-Go2"
         },

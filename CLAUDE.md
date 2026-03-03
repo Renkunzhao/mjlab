@@ -1,5 +1,6 @@
 # Development Workflow
 
+**Always use Chinese**.
 **Always use `uv run`, not python**.
 
 ```sh
@@ -35,6 +36,14 @@ Before creating a PR, ensure all checks pass with `make test`.
 When making user-facing changes, add an entry to `docs/source/changelog.rst`
 under the "Upcoming version (not yet released)" section using
 Added/Changed/Fixed categories.
+
+# Skill Maintenance
+
+After modifying any file under `src/mjlab/tasks/hopping/`, update
+`.claude/commands/go2-hopping.md` to reflect the current state of the task.
+The skill should stay accurate and concise — update or remove outdated entries
+(gotchas, design decisions, reward weights) rather than accumulating stale notes.
+Do not add entries for things that are already obvious from the code.
 
 Some style guidelines to follow:
 - Line length limit is 88 columns. This applies to code, comments, and docstrings.
