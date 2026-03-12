@@ -114,14 +114,14 @@
       "problemMatcher": [],
     },
     {
-      "label": "Convert motion (Go2 pkl)",
+      "label": "Convert motion (MimicKit)",
       "type": "shell",
       "command": "uv",
       "args": [
         "run",
         "python",
         "-m",
-        "mjlab.scripts.pkl_to_npz_go2",
+        "mjlab.scripts.convert_mimickit",
         "--input-file",
         "${input:input-file}",
         "--output-name",
