@@ -1,175 +1,200 @@
 {
-    "version": "2.0.0",
-    "inputs": [
-        {
-            "id": "task",
-            "type": "pickString",
-            "description": "Select task",
-            "options": [
-                "Mjlab-Tracking-Flat-Unitree-G1",
-                "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
-                "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation-Tau-Reward",
-                "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation-Torque",
-                "Mjlab-Velocity-Rough-Unitree-G1",
-                "Mjlab-Velocity-Flat-Unitree-G1",
-                "Mjlab-Velocity-Rough-Unitree-Go1",
-                "Mjlab-Velocity-Flat-Unitree-Go1",
-                "Mjlab-Velocity-Rough-Unitree-Go2",
-                "Mjlab-Velocity-Flat-Unitree-Go2",
-                "Mjlab-Hopping-Flat-Unitree-Go2"
-            ],
-            "default": "Mjlab-Hopping-Flat-Unitree-Go2"
-        },
-        {
-            "id": "input-file",
-            "type": "promptString",
-            "description": "Type input motion file",
-            "default": ""
-        },
-        {
-            "id": "torque-file",
-            "type": "promptString",
-            "description": "Type input torque file (.csv) or skip",
-            "default": "skip"
-        },
-        {
-            "id": "run-name",
-            "type": "promptString",
-            "description": "Type wandb run name",
-            "default": ""
-        },
-        {
-            "id": "registry-name",
-            "type": "promptString",
-            "description": "Type registry name",
-            "default": ""
-        },
-        {
-            "id": "video",
-            "type": "pickString",
-            "description": "Select whether to render video",
-            "options": [
-                "True", 
-                "False"
-            ],
-            "default": "False"
-        },
-        {
-            "id": "resume",
-            "type": "pickString",
-            "description": "Select whether to resume training",
-            "options": [
-                "True", 
-                "False"
-            ],
-            "default": "False"
-        },
-        {
-            "id": "wandb-run-path",
-            "type": "promptString",
-            "description": "Type wandb run path",
-            "default": ""
-        },
-        {
-            "id": "viewer",
-            "type": "pickString",
-            "description": "Select viewer",
-            "options": [
-                "native", 
-                "viser"
-            ],
-            "default": "viser"
-        },
-        {
-            "id": "num_envs",
-            "type": "promptString",
-            "description": "Type number of environments",
-            "default": "1"
-        },
-    ],  
-    "tasks": [
-        {
-            "label": "List env",
-            "type": "shell",
-            "command": "uv run list_envs",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Convert motion",
-            "type": "shell",
-            "command": "uv",
-            "args": [
-                "run", "python", "-m",
-                "mjlab.scripts.csv_to_npz",
-                "--input-file", "${input:input-file}",
-                "--torque-file", "${input:torque-file}",
-                "--output-name", "${input:run-name}",
-                "--input-fps", "30",
-                "--output-fps", "50",
-                "--render", "${input:video}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "MUJOCO_GL": "egl"
-                }
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Visualize motion",
-            "type": "shell",
-            "command": "uv",
-            "args": [
-                "run", "play", "${input:task}",
-                "--agent", "zero",
-                "--viewer","${input:viewer}",
-                "--registry-name", "${input:registry-name}",
-                "--no-terminations", "True"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Train",
-            "type": "shell",
-            "command": "uv",
-            "args": [
-                "run", "train", "${input:task}",
-                "--env.scene.num-envs", "4096",
-                "--registry-name", "${input:registry-name}",
-                "--video", "${input:video}",
-                "--agent.run-name", "${input:run-name}",
-                "--agent.resume", "${input:resume}",
-                "--wandb-run-path", "${input:wandb-run-path}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "MUJOCO_GL": "egl"
-                }
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Play",
-            "type": "shell",
-            "command": "uv",
-            "args": [
-                "run", "play", "${input:task}",
-                "--num_envs", "${input:num_envs}",
-                "--viewer","${input:viewer}",
-                "--wandb-run-path", "${input:wandb-run-path}"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        }
-    ]
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "task",
+      "type": "pickString",
+      "description": "Select task",
+      "options": [
+        "Mjlab-Tracking-Flat-Unitree-G1",
+        "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
+        "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation-Tau-Reward",
+        "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation-Torque",
+        "Mjlab-Velocity-Rough-Unitree-G1",
+        "Mjlab-Velocity-Flat-Unitree-G1",
+        "Mjlab-Velocity-Rough-Unitree-Go1",
+        "Mjlab-Velocity-Flat-Unitree-Go1",
+        "Mjlab-Velocity-Rough-Unitree-Go2",
+        "Mjlab-Velocity-Flat-Unitree-Go2",
+        "Mjlab-Hopping-Flat-Unitree-Go2",
+        "Mjlab-Tracking-Flat-Unitree-Go2",
+        "Mjlab-Tracking-Flat-Unitree-Go2-No-State-Estimation",
+      ],
+      "default": "Mjlab-Tracking-Flat-Unitree-Go2-No-State-Estimation",
+    },
+    {
+      "id": "input-file",
+      "type": "promptString",
+      "description": "Type input motion file",
+      "default": "",
+    },
+    {
+      "id": "torque-file",
+      "type": "promptString",
+      "description": "Type input torque file (.csv) or skip",
+      "default": "skip",
+    },
+    {
+      "id": "run-name",
+      "type": "promptString",
+      "description": "Type wandb run name",
+      "default": "",
+    },
+    {
+      "id": "registry-name",
+      "type": "promptString",
+      "description": "Type registry name",
+      "default": "",
+    },
+    {
+      "id": "video",
+      "type": "pickString",
+      "description": "Select whether to render video",
+      "options": ["True", "False"],
+      "default": "False",
+    },
+    {
+      "id": "resume",
+      "type": "pickString",
+      "description": "Select whether to resume training",
+      "options": ["True", "False"],
+      "default": "False",
+    },
+    {
+      "id": "wandb-run-path",
+      "type": "promptString",
+      "description": "Type wandb run path",
+      "default": "",
+    },
+    {
+      "id": "viewer",
+      "type": "pickString",
+      "description": "Select viewer",
+      "options": ["native", "viser"],
+      "default": "viser",
+    },
+    {
+      "id": "num_envs",
+      "type": "promptString",
+      "description": "Type number of environments",
+      "default": "1",
+    },
+  ],
+  "tasks": [
+    {
+      "label": "List env",
+      "type": "shell",
+      "command": "uv run list_envs",
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+    },
+    {
+      "label": "Convert motion",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "mjlab.scripts.csv_to_npz",
+        "--input-file",
+        "${input:input-file}",
+        "--torque-file",
+        "${input:torque-file}",
+        "--output-name",
+        "${input:run-name}",
+        "--input-fps",
+        "30",
+        "--output-fps",
+        "50",
+        "--render",
+        "${input:video}",
+      ],
+      "options": {"cwd": "${workspaceFolder}", "env": {"MUJOCO_GL": "egl"}},
+      "problemMatcher": [],
+    },
+    {
+      "label": "Convert motion (Go2 pkl)",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "mjlab.scripts.pkl_to_npz_go2",
+        "--input-file",
+        "${input:input-file}",
+        "--output-name",
+        "${input:run-name}",
+        "--output-fps",
+        "50",
+        "--render",
+        "${input:video}",
+      ],
+      "options": {"cwd": "${workspaceFolder}", "env": {"MUJOCO_GL": "egl"}},
+      "problemMatcher": [],
+    },
+    {
+      "label": "Visualize motion",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "play",
+        "${input:task}",
+        "--agent",
+        "zero",
+        "--viewer",
+        "${input:viewer}",
+        "--registry-name",
+        "${input:registry-name}",
+        "--no-terminations",
+        "True",
+      ],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+    },
+    {
+      "label": "Train",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "train",
+        "${input:task}",
+        "--env.scene.num-envs",
+        "4096",
+        "--registry-name",
+        "${input:registry-name}",
+        "--video",
+        "${input:video}",
+        "--agent.run-name",
+        "${input:run-name}",
+        "--agent.resume",
+        "${input:resume}",
+        "--wandb-run-path",
+        "${input:wandb-run-path}",
+      ],
+      "options": {"cwd": "${workspaceFolder}", "env": {"MUJOCO_GL": "egl"}},
+      "problemMatcher": [],
+    },
+    {
+      "label": "Play",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "run",
+        "play",
+        "${input:task}",
+        "--num_envs",
+        "${input:num_envs}",
+        "--viewer",
+        "${input:viewer}",
+        "--wandb-run-path",
+        "${input:wandb-run-path}",
+      ],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+    },
+  ],
 }
