@@ -2,6 +2,16 @@
 Changelog
 =========
 
+Upcoming version (not yet released)
+-----------------------------------
+
+Added
+^^^^^
+
+- Added a dedicated VS Code task for ``mjlab.scripts.convert_gc_go2`` with
+  prompts for CSV path, FPS, device selection, optional line range, and video
+  rendering.
+
 Version 1.1.1 (February 14, 2026)
 ---------------------------------
 
