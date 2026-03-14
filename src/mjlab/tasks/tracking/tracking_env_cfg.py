@@ -229,7 +229,7 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "motion_global_root_ori": RewardTermCfg(
       func=mdp.motion_global_anchor_orientation_error_exp,
-      weight=0.5,
+      weight=1.5,
       params={"command_name": "motion", "std": 0.4},
     ),
     "motion_body_pos": RewardTermCfg(
@@ -249,8 +249,8 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "motion_body_ang_vel": RewardTermCfg(
       func=mdp.motion_global_body_angular_velocity_error_exp,
-      weight=1.0,
-      params={"command_name": "motion", "std": 3.14},
+      weight=3.0,
+      params={"command_name": "motion", "std": 6.28},
     ),
     # Full tracking reward set. Per-task cfg can remove this term via flags.
     "motion_joint_torque": RewardTermCfg(
